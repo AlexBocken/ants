@@ -11,11 +11,10 @@ License: AGPL 3 (see end of file)
 import numpy as np
 from mesa.model import Model
 from mesa.space import Coordinate, HexGrid, Iterable
-from multihex import MultiHexGrid, MultiHexGridScalarFields
+from multihex import MultiHexGridScalarFields
 from mesa.time import SimultaneousActivation
 from mesa.datacollection import DataCollector
 from agent import RandomWalkerAnt
-from agent import Pheromone
 
 class ActiveWalkerModel(Model):
     # TODO: separate food and source into new agents?
@@ -25,11 +24,7 @@ class ActiveWalkerModel(Model):
                  nest_position : Coordinate,
                  max_steps:int=1000) -> None:
         super().__init__()
-        fields={"A" : True,         # key : also have _next prop (for no interference in step)
-                      "B": True,
-                      "nests": False,
-                      "food" : False,
-                      }
+        fields=["A", "B", "nests", "food"]
         self.schedule = SimultaneousActivation(self)
         self.grid = MultiHexGridScalarFields(width=width, height=height, torus=True, fields=fields)
         self._unique_id_counter = -1
@@ -43,7 +38,7 @@ class ActiveWalkerModel(Model):
                             }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
-            agent = RandomWalkerAnt(unique_id=agent_id, model=self, do_follow_chemical_A=True)
+            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_chemical="A")
             self.schedule.add(agent)
             self.grid.place_agent(agent, pos=nest_position)
 
@@ -53,6 +48,12 @@ class ActiveWalkerModel(Model):
                 )
         self.datacollector.collect(self) # keep at end of __init___
 
+    def agent_density(self):
+        a = np.zeros((self.grid.width, self.grid.height))
+        for i in range(self.grid.width):
+            for j in range(self.grid.height):
+                a[i,j] = len(self.grid[(i,j)])
+        return a
 
 
     def step(self):
