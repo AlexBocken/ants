@@ -12,6 +12,7 @@ License: AGPL 3 (see end of file)
 from mesa.space import HexGrid
 from mesa.agent import Agent
 import numpy as np
+import numpy.typing as npt
 from mesa.space import Coordinate, accept_tuple_argument
 import itertools
 from typing import (
@@ -91,6 +92,32 @@ class MultiHexGrid(HexGrid):
         )
 
 
+class MultiHexGridScalarFields(MultiHexGrid):
+    def __init__(self, fields: dict[str, bool], width : int, height : int, torus : bool, scalar_initial_value : float=0) -> None:
+        super().__init__(width=width, height=height, torus=torus)
+        self._field_props = fields
+
+        self.fields : dict[str, npt.NDArray[np.float_]] = {}
+
+        for key, is_step_field in fields.items():
+            self.fields[key] = np.ones((width, height)).astype(float) * scalar_initial_value
+            if is_step_field:
+                self.fields[f"_next_{key}"] = np.zeros((width, height)).astype(float)
+
+    def reset_field(self, key : str) -> None:
+        self.fields[key] = np.zeros((self.width, self.height))
+
+    def add_to_field(self, field_key : str, value : float, pos : Coordinate) -> None:
+        if self._field_props[field_key]:
+            self.fields[f"_next_{field_key}"][pos] += value
+        else:
+            self.fields[field_key][pos] += value
+
+    def step(self) -> None:
+        for key, is_step_field in self._field_props.items():
+            if is_step_field:
+                self.fields[key] += self.fields[f"_next_{key}"]
+                self.reset_field(f"_next_{key}")
 
 """
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3.

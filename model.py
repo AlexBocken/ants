@@ -11,24 +11,36 @@ License: AGPL 3 (see end of file)
 import numpy as np
 from mesa.model import Model
 from mesa.space import Coordinate, HexGrid, Iterable
-from multihex import MultiHexGrid
+from multihex import MultiHexGrid, MultiHexGridScalarFields
 from mesa.time import SimultaneousActivation
 from mesa.datacollection import DataCollector
 from agent import RandomWalkerAnt
+from agent import Pheromone
 
 class ActiveWalkerModel(Model):
+    # TODO: separate food and source into new agents?
+    # TODO: pheromone concentrations as well as agents?
     def __init__(self, width : int, height : int , num_max_agents : int,
                  num_initial_roamers : int,
                  nest_position : Coordinate,
                  max_steps:int=1000) -> None:
         super().__init__()
+        fields={"A" : True,         # key : also have _next prop (for no interference in step)
+                      "B": True,
+                      "nests": False,
+                      "food" : False,
+                      }
         self.schedule = SimultaneousActivation(self)
-        self.grid = MultiHexGrid(width=width, height=height, torus=True) # TODO: replace with MultiHexGrid
-        self._unique_id_counter : int = -1 # only touch via get_unique_id() or get_unique_ids(num_ids)
+        self.grid = MultiHexGridScalarFields(width=width, height=height, torus=True, fields=fields)
+        self._unique_id_counter = -1
 
         self.max_steps = max_steps
         self.nest_position : Coordinate = nest_position
         self.num_max_agents = num_max_agents
+
+        self.decay_rates = {"A" :1,
+                            "B": 1,
+                            }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
             agent = RandomWalkerAnt(unique_id=agent_id, model=self, do_follow_chemical_A=True)
@@ -41,8 +53,18 @@ class ActiveWalkerModel(Model):
                 )
         self.datacollector.collect(self) # keep at end of __init___
 
+
+
     def step(self):
-        self.schedule.step()
+        self.schedule.step()        # step() and advance() all agents
+
+        # apply decay rate on pheromone levels
+        for key in ("A", "B"):
+            field = self.grid.fields[key]
+            self.grid.fields[key] =  field - self.decay_rates[key]*field
+
+        self.grid.step() # actually apply deposits on fields
+
         self.datacollector.collect(self)
 
         if self.schedule.steps >= self.max_steps:

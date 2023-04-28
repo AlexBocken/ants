@@ -32,6 +32,7 @@ def main():
             agent.do_follow_chemical_A = False
             agent.prev_pos = (9,10)
             print(agent.front_neighbors)
+
         print(agent.pos, agent.unique_id, agent.do_follow_chemical_A)
 
 
