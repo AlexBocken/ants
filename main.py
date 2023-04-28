@@ -27,13 +27,27 @@ def main():
                               max_steps=max_steps)
 
     # just initial testing of MultiHexGrid
+    a = model.agent_density()
+    for loc in model.grid.iter_neighborhood(nest_position):
+        a[loc] = 3
     for agent in model.grid.get_neighbors(pos=nest_position, include_center=True):
         if agent.unique_id == 2:
-            agent.do_follow_chemical_A = False
+            agent.look_for_chemical = "A"
             agent.prev_pos = (9,10)
-            print(agent.front_neighbors)
+            a[agent.prev_pos] = 1
+            for pos in agent.front_neighbors:
+                a[pos] = 6
+            agent.step()
+            print(f"{agent._next_pos=}")
+            agent.advance()
+            print(agent.front_neighbor)
+            a[agent.front_neighbor] = 5
 
-        print(agent.pos, agent.unique_id, agent.do_follow_chemical_A)
+        print(agent.pos, agent.unique_id, agent.look_for_chemical)
+    neighbors = model.grid.get_neighborhood(nest_position)
+    print(neighbors)
+
+    print(a)
 
 
 if __name__ == "__main__":
