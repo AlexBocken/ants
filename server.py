@@ -3,7 +3,7 @@
 server.py - Part of ants project
 
 This file sets up the mesa built-in visualization server
-and runs it on file execution.
+and runs it on file execution. (python server.py or on UNIX: ./server.py)
 For now it displays ant locations as well as pheromone A
 concentrations on two seperate grids
 
@@ -59,10 +59,9 @@ def setup():
         level: level to calculate color between white and black (linearly)
         normalization: value for which we want full black color
         """
-        rgb = int(255 - level * 255 / normalization)
+        rgb = max(int(255 - level * 255 / normalization), 0)
         mono = f"{rgb:0{2}x}" # hex value of rgb value with fixed length 2
-        rgb = f"#{3*mono}"
-        return rgb
+        return f"#{3*mono}"
 
     def portray_ant_density(model, pos):
         return {
