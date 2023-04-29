@@ -8,3 +8,5 @@ For this, we decided to implement an enhanced version of [Active random walkers 
 
 For now, wanted features can be found in our [shortlist](shortlist.md).
 For everything else start at [main py](main.py)
+
+For a live visualization of the project you can execute [server.py](server.py).
