@@ -14,14 +14,14 @@ from typing import overload
 
 class RandomWalkerAnt(Agent):
     def __init__(self, unique_id, model, look_for_chemical=None,
-                 energy_0=1, chemical_drop_rate_0=1, sensitvity_0=1, alpha=0.5) -> None:
+                 energy_0=1, chemical_drop_rate_0=1, sensitvity_0=1, alpha=0.5, drop_chemical=None) -> None:
         super().__init__(unique_id=unique_id, model=model)
 
         self._next_pos : None | Coordinate = None
 
         self.prev_pos : None | Coordinate = None
         self.look_for_chemical = look_for_chemical
-        self.drop_chemical = None
+        self.drop_chemical = drop_chemical
         self.energy : float = energy_0
         self.sensitvity : float = sensitvity_0
         self.chemical_drop_rate : float = chemical_drop_rate_0 #TODO: check whether needs to be separated into A and B
@@ -34,6 +34,10 @@ class RandomWalkerAnt(Agent):
 
     def step(self):
         # follow positive gradient
+        if self.prev_pos is None:
+            i = np.random.choice(range(6))
+            self._next_pos = self.neighbors()[i]
+            return
         if self.look_for_chemical is not None:
             front_concentration = [self.model.grid.fields[self.look_for_chemical][cell] for cell in self.front_neighbors ]
             gradient = front_concentration - np.repeat(self.model.grid.fields[self.look_for_chemical][self.pos], 3)
@@ -61,8 +65,7 @@ class RandomWalkerAnt(Agent):
     def advance(self) -> None:
         self.drop_chemicals()
         self.prev_pos = self.pos
-        self.pos = self._next_pos
-
+        self.model.grid.move_agent(self, self._next_pos)
 
     # TODO: find out how to decorate with property properly
     def neighbors(self, pos=None, include_center=False):

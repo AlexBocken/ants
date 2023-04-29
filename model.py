@@ -33,12 +33,12 @@ class ActiveWalkerModel(Model):
         self.nest_position : Coordinate = nest_position
         self.num_max_agents = num_max_agents
 
-        self.decay_rates = {"A" :1,
-                            "B": 1,
-                            }
+        self.decay_rates : dict[str, float] = {"A" :0.1,
+                                               "B": 0.1,
+                                               }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
-            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_chemical="A")
+            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_chemical="A", drop_chemical="A")
             self.schedule.add(agent)
             self.grid.place_agent(agent, pos=nest_position)
 
@@ -63,8 +63,6 @@ class ActiveWalkerModel(Model):
         for key in ("A", "B"):
             field = self.grid.fields[key]
             self.grid.fields[key] =  field - self.decay_rates[key]*field
-
-        self.grid.step() # actually apply deposits on fields
 
         self.datacollector.collect(self)
 
