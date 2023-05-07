@@ -12,20 +12,21 @@ License: AGPL 3 (see end of file)
 """
 
 import numpy as np
-from mesa.visualization.modules import CanvasHexGrid, ChartModule, CanvasGrid
+from mesa.visualization.modules import CanvasHexGrid, ChartModule, CanvasGrid, TextElement
 from mesa.visualization.ModularVisualization import ModularServer
 from mesa.visualization.UserParam import UserSettableParameter
 from model import ActiveWalkerModel
 from collections import defaultdict
 
-def setup():
+def setup(params=None):
     # Set the model parameters
-    params = {
-              "width": 50, "height": 50,
-              "num_max_agents" : 100,
-              "nest_position" : (25,25),
-              "num_initial_roamers" : 5,
-              }
+    if params is None:
+        params = {
+                  "width": 50, "height": 50,
+                  "num_max_agents" : 100,
+                  "nest_position" : (25,25),
+                  "num_initial_roamers" : 5,
+                  }
 
 
     class CanvasHexGridMultiAgents(CanvasHexGrid):
@@ -59,11 +60,19 @@ def setup():
         level: level to calculate color between white and black (linearly)
         normalization: value for which we want full black color
         """
-        rgb = max(int(255 - level * 255 / normalization), 0)
-        mono = f"{rgb:0{2}x}" # hex value of rgb value with fixed length 2
-        return f"#{3*mono}"
+        return max(int(255 - level * 255 / normalization), 0)
+
 
     def portray_ant_density(model, pos):
+        if model.grid.is_nest(pos):
+            col = "red"
+        elif model.grid.is_food(pos):
+            col = "green"
+        else:
+            col = get_color(level=len(model.grid[pos]), normalization=5)
+            col = f"rgb({col}, {col}, {col})"
+
+
         return {
             "Shape": "hex",
             "r": 1,
@@ -71,10 +80,12 @@ def setup():
             "Layer": 0,
             "x": pos[0],
             "y": pos[1],
-            "Color": get_color(level=len(model.grid[pos]), normalization=5)
+            "Color":  col,
         }
 
     def portray_pheromone_density(model, pos):
+        col_a = get_color(level=model.grid.fields["A"][pos], normalization=3)
+        col_b = get_color(level=model.grid.fields["B"][pos], normalization=3)
         return {
             "Shape": "hex",
             "r": 1,
@@ -82,7 +93,7 @@ def setup():
             "Layer": 0,
             "x": pos[0],
             "y": pos[1],
-            "Color": get_color(level=model.grid.fields["A"][pos], normalization=3)
+            "Color": f"rgb({col_a}, {col_b}, 255)"
         }
 
 
@@ -92,7 +103,8 @@ def setup():
     pixel_ratio = 10
     grid_ants = CanvasHexGridMultiAgents(portray_ant_density, width, height, width*pixel_ratio, height*pixel_ratio)
     grid_pheromones = CanvasHexGridMultiAgents(portray_pheromone_density, width, height, width*pixel_ratio, height*pixel_ratio)
-    return ModularServer(ActiveWalkerModel, [grid_ants, grid_pheromones],
+    test_text = TextElement()
+    return ModularServer(ActiveWalkerModel, [lambda m: "<h3>Ant density</h3><h5>Nest: Red, Food: Green</h5>", grid_ants, lambda m: "<h3>Pheromone Density</h3><h5>Pheromone A: Cyan, Pheromone B: Pink</h5>", grid_pheromones],
                            "Active Random Walker Ants", params)
 
 if __name__ == "__main__":

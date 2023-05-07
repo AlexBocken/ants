@@ -7,14 +7,15 @@ License: AGPL 3 (see end of file)
 (C) Alexander Bocken, Viviane Fahrni, Grace Kragho
 """
 import numpy as np
+import numpy.typing as npt
 from mesa.agent import Agent
 from mesa.space import Coordinate
-from typing import overload
-
 
 class RandomWalkerAnt(Agent):
     def __init__(self, unique_id, model, look_for_chemical=None,
-                 energy_0=1, chemical_drop_rate_0=1, sensitvity_0=1, alpha=0.5, drop_chemical=None) -> None:
+                 energy_0=1, chemical_drop_rate_0=1, sensitvity_0=0.1,
+                 alpha=0.5, drop_chemical=None,
+                 ) -> None:
         super().__init__(unique_id=unique_id, model=model)
 
         self._next_pos : None | Coordinate = None
@@ -28,19 +29,62 @@ class RandomWalkerAnt(Agent):
         self.alpha = alpha
 
 
-    def sensitvity_to_concentration(self, prop : float) -> float:
-        # TODO
-        return prop
+    def sens_adj(self, props) -> npt.NDArray[np.float_] | float:
+        # if props iterable create array, otherwise return single value
+        try:
+            iter(props)
+        except TypeError:
+            if props > self.sensitvity:
+                # TODO: nonlinear response
+                return props
+            else:
+                return 0
+
+        arr : list[float] = []
+        for prop in props:
+            arr.append(self.sens_adj(prop))
+        return np.array(arr)
+
 
     def step(self):
-        # follow positive gradient
+        # TODO: sensitvity decay
+
         if self.prev_pos is None:
             i = np.random.choice(range(6))
             self._next_pos = self.neighbors()[i]
             return
+
+        # Ants dropping A look for food
+        if self.drop_chemical == "A":
+            for neighbor in self.front_neighbors:
+                if self.model.grid.is_food(neighbor):
+                    self.drop_chemical = "B"
+                    self.prev_pos = neighbor
+                    self._next_pos = self.pos
+
+        # Ants dropping B look for nest
+        elif self.drop_chemical == "B":
+            for neighbor in self.front_neighbors:
+                if self.model.grid.is_nest(neighbor):
+                    self.look_for_chemical = "A" # Is this a correct interpretation?
+                    self.drop_chemical = "A"
+                    #TODO: Do we flip the ant here or reset prev pos?
+                    # For now, flip ant just like at food
+                    self.prev_pos = neighbor
+                    self._next_pos = self.pos
+
+                    for agent_id in self.model.get_unique_ids(self.model.num_new_recruits):
+                        agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_chemical="B", drop_chemical="A")
+                        agent._next_pos = self.pos
+                        self.model.schedule.add(agent)
+                        self.model.grid.place_agent(agent, pos=neighbor)
+
+        # follow positive gradient
         if self.look_for_chemical is not None:
             front_concentration = [self.model.grid.fields[self.look_for_chemical][cell] for cell in self.front_neighbors ]
-            gradient = front_concentration - np.repeat(self.model.grid.fields[self.look_for_chemical][self.pos], 3)
+            front_concentration = self.sens_adj(front_concentration)
+            current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_chemical][self.pos])
+            gradient = front_concentration - np.repeat(current_pos_concentration, 3)
             index = np.argmax(gradient)
             if gradient[index] > 0:
                 self._next_pos = self.front_neighbors[index]
