@@ -30,17 +30,21 @@ class ActiveWalkerModel(Model):
         self._unique_id_counter = -1
 
         self.max_steps = max_steps
-        self.nest_position : Coordinate = nest_position
+        self.grid.add_nest(nest_position)
         self.num_max_agents = num_max_agents
+        self.num_new_recruits = 5
 
-        self.decay_rates : dict[str, float] = {"A" :0.1,
-                                               "B": 0.1,
+        self.decay_rates : dict[str, float] = {"A" :0.01,
+                                               "B": 0.01,
                                                }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
             agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_chemical="A", drop_chemical="A")
             self.schedule.add(agent)
             self.grid.place_agent(agent, pos=nest_position)
+
+        for _ in range(5):
+            self.grid.add_food(5)
 
         self.datacollector = DataCollector(
                 model_reporters={},

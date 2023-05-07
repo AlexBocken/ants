@@ -9,6 +9,7 @@ License: AGPL 3 (see end of file)
 (C) Alexander Bocken, Viviane Fahrni, Grace Kragho
 """
 
+from sys import dont_write_bytecode
 from mesa.space import HexGrid
 from mesa.agent import Agent
 import numpy as np
@@ -103,6 +104,54 @@ class MultiHexGridScalarFields(MultiHexGrid):
 
     def reset_field(self, key : str) -> None:
         self.fields[key] = np.zeros((self.width, self.height))
+
+    def is_food(self, pos):
+        assert('food' in self.fields.keys())
+        return bool(self.fields['food'][pos])
+
+    def add_food(self, size : int , pos=None):
+        """
+        Adds food source to grid.
+        Args:
+        pos (optional): if None, selects random place on grid which
+                        is not yet occupied by either a nest or another food source
+        size:           how much food should be added to field
+        """
+        assert('food' in self.fields.keys())
+        if pos is None:
+            def select_random_place():
+                i = np.random.randint(0, self.width)
+                j = np.random.randint(0, self.height)
+                return i,j
+            pos = select_random_place()
+            while(self.is_nest(pos) or self.is_food(pos)):
+                pos = select_random_place()
+
+        self.fields['food'][pos] = size
+
+    def is_nest(self, pos : Coordinate) -> bool:
+        assert('nests' in self.fields.keys())
+        return bool(self.fields['nests'][pos])
+
+    def add_nest(self, pos:None|Coordinate=None):
+        """
+        Adds nest to grid.
+        Args:
+        pos:    if None, selects random place on grid which
+                is not yet occupied by either a nest or another food source
+        """
+        assert('nests' in self.fields.keys())
+        if pos is None:
+            def select_random_place():
+                i = np.random.randint(0, self.width)
+                j = np.random.randint(0, self.height)
+                return i,j
+            pos = select_random_place()
+            while(self.is_nest(pos) or self.is_food(pos)):
+                pos = select_random_place()
+
+        self.fields['nests'][pos] = True
+
 
 """
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3.
