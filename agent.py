@@ -13,66 +13,99 @@ from mesa.space import Coordinate
 
 class RandomWalkerAnt(Agent):
     def __init__(self, unique_id, model, look_for_chemical=None,
-                 energy_0=1, chemical_drop_rate_0=1, sensitvity_0=0.1,
+                 energy_0=1,
+                 chemical_drop_rate_0 : dict[str, float]={"A": 80, "B": 80},
+                 sensitivity_0=0.99,
                  alpha=0.5, drop_chemical=None,
+                 betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
+                 sensitivity_decay_rate=0.01,
+                 sensitivity_max = 1
                  ) -> None:
+
         super().__init__(unique_id=unique_id, model=model)
 
         self._next_pos : None | Coordinate = None
-
         self.prev_pos : None | Coordinate = None
+
         self.look_for_chemical = look_for_chemical
         self.drop_chemical = drop_chemical
-        self.energy : float = energy_0
-        self.sensitvity : float = sensitvity_0
-        self.chemical_drop_rate : float = chemical_drop_rate_0 #TODO: check whether needs to be separated into A and B
+        self.energy = energy_0 #TODO: use
+        self.sensitivity_0 = sensitivity_0
+        self.sensitivity = self.sensitivity_0
+        self.chemical_drop_rate = chemical_drop_rate_0
         self.alpha = alpha
+        self.sensitivity_max = sensitivity_max
+        self.sensitivity_decay_rate = sensitivity_decay_rate
+        self.betas = betas
+        self.threshold : dict[str, float] = {"A": 1, "B": 1}
 
 
-    def sens_adj(self, props) -> npt.NDArray[np.float_] | float:
+    def sens_adj(self, props, key) -> npt.NDArray[np.float_] | float:
+        """
+        returns the adjusted value of any property dependent on the current
+        sensitivity.
+        The idea is to have a nonlinear response, where any opinion below a
+        threshold (here: self.threshold[key]) is ignored, otherwise it returns
+        the property
+        Long-term this function should be adjusted to return the property up
+        to a upper threshold as well.
+
+
+          returns   ^
+                    |
+            sens_max|           __________
+                    |          /
+                    |         /
+                q^tr|        /
+                    |
+                   0|________
+                    -----------------------> prop
+        """
         # if props iterable create array, otherwise return single value
         try:
             iter(props)
         except TypeError:
-            if props > self.sensitvity:
-                # TODO: nonlinear response
+            # TODO: proper nonlinear response, not just clamping
+            if props > self.sensitivity_max:
+                return self.sensitivity_max
+            if props > self.threshold[key]:
                 return props
             else:
                 return 0
 
         arr : list[float] = []
         for prop in props:
-            arr.append(self.sens_adj(prop))
+            arr.append(self.sens_adj(prop, key))
         return np.array(arr)
 
-
-    def step(self):
-        # TODO: sensitvity decay
-
+    def _choose_next_pos(self):
         if self.prev_pos is None:
             i = np.random.choice(range(6))
             self._next_pos = self.neighbors()[i]
             return
 
-        # Ants dropping A look for food
-        if self.drop_chemical == "A":
+        if self.searching_food:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_food(neighbor):
                     self.drop_chemical = "B"
+                    self.sensitivity = self.sensitivity_0
+
                     self.prev_pos = neighbor
                     self._next_pos = self.pos
 
-        # Ants dropping B look for nest
-        elif self.drop_chemical == "B":
+        elif self.searching_nest:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_nest(neighbor):
                     self.look_for_chemical = "A" # Is this a correct interpretation?
                     self.drop_chemical = "A"
+                    self.sensitivity = self.sensitivity_0
+
                     #TODO: Do we flip the ant here or reset prev pos?
                     # For now, flip ant just like at food
                     self.prev_pos = neighbor
                     self._next_pos = self.pos
 
+                    # recruit new ants
                     for agent_id in self.model.get_unique_ids(self.model.num_new_recruits):
                         agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_chemical="B", drop_chemical="A")
                         agent._next_pos = self.pos
@@ -82,8 +115,8 @@ class RandomWalkerAnt(Agent):
         # follow positive gradient
         if self.look_for_chemical is not None:
             front_concentration = [self.model.grid.fields[self.look_for_chemical][cell] for cell in self.front_neighbors ]
-            front_concentration = self.sens_adj(front_concentration)
-            current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_chemical][self.pos])
+            front_concentration = self.sens_adj(front_concentration, self.look_for_chemical)
+            current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_chemical][self.pos], self.look_for_chemical)
             gradient = front_concentration - np.repeat(current_pos_concentration, 3)
             index = np.argmax(gradient)
             if gradient[index] > 0:
@@ -101,10 +134,20 @@ class RandomWalkerAnt(Agent):
             random_index = np.random.choice(range(len(other_neighbors)))
             self._next_pos = other_neighbors[random_index]
 
+
+    def step(self):
+        self.sensitivity -= self.sensitivity_decay_rate
+        self._choose_next_pos()
+        self._adjust_chemical_drop_rate()
+
+    def _adjust_chemical_drop_rate(self):
+        if(self.drop_chemical is not None):
+            self.chemical_drop_rate[self.drop_chemical] -= self.chemical_drop_rate[self.drop_chemical] * self.betas[self.drop_chemical]
+
     def drop_chemicals(self) -> None:
         # should only be called in advance() as we do not use hidden fields
         if self.drop_chemical is not None:
-            self.model.grid.fields[self.drop_chemical][self.pos] += self.chemical_drop_rate
+            self.model.grid.fields[self.drop_chemical][self.pos] += self.chemical_drop_rate[self.drop_chemical]
 
     def advance(self) -> None:
         self.drop_chemicals()
@@ -116,6 +159,14 @@ class RandomWalkerAnt(Agent):
         if pos is None:
             pos = self.pos
         return self.model.grid.get_neighborhood(pos, include_center=include_center)
+
+    @property
+    def searching_nest(self) -> bool:
+        return self.drop_chemical == "B"
+
+    @property
+    def searching_food(self) -> bool:
+        return self.drop_chemical == "A"
 
     @property
     def front_neighbors(self):
