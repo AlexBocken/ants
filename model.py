@@ -20,6 +20,8 @@ class ActiveWalkerModel(Model):
     def __init__(self, width : int, height : int , num_max_agents : int,
                  num_initial_roamers : int,
                  nest_position : Coordinate,
+                 num_food_sources=5,
+                 food_size=10,
                  max_steps:int=1000) -> None:
         super().__init__()
         fields=["A", "B", "nests", "food"]
@@ -41,8 +43,8 @@ class ActiveWalkerModel(Model):
             self.schedule.add(agent)
             self.grid.place_agent(agent, pos=nest_position)
 
-        for _ in range(5):
-            self.grid.add_food(5)
+        for _ in range(num_food_sources):
+            self.grid.add_food(food_size)
 
         self.datacollector = DataCollector(
                 model_reporters={},
