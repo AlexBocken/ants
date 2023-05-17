@@ -39,7 +39,7 @@ class ActiveWalkerModel(Model):
                                                }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
-            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_chemical="A", drop_chemical="A")
+            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_pheromone="A", drop_pheromone="A")
             self.schedule.add(agent)
             self.grid.place_agent(agent, pos=nest_position)
 

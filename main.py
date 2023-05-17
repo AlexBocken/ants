@@ -15,6 +15,7 @@ from mesa.space import Coordinate
 def main():
     check_pheromone_exponential_decay()
     check_ant_sensitivity_linear_decay()
+    check_ant_pheromone_exponential_decay()
 
 def check_pheromone_exponential_decay():
     """
@@ -102,6 +103,51 @@ def check_ant_sensitivity_linear_decay():
     plt.legend(loc='best')
 
     plt.show()
+
+def check_ant_pheromone_exponential_decay():
+    """
+    Check whether wanted exponential decay of pheromone drop rate for ants is correctly modeled
+    shows plot of pheromone placed on grid vs. equivalent exponential decay function
+    """
+
+    from mesa.datacollection import DataCollector
+
+    width = 50
+    height = width
+    num_initial_roamers = 1
+    num_max_agents = 100
+    nest_position : Coordinate = (width //2, height //2)
+    max_steps = 1000
+
+    model = ActiveWalkerModel(width=width, height=height,
+                              num_initial_roamers=num_initial_roamers,
+                              nest_position=nest_position,
+                              num_max_agents=num_max_agents,
+                              max_steps=max_steps)
+
+
+    model.datacollector = DataCollector(
+            model_reporters={},
+            agent_reporters={"pheromone_drop_rate": lambda a: a.pheromone_drop_rate["A"]}
+                )
+    start = model.schedule.agents[0].pheromone_drop_rate["A"]
+    model.run_model()
+    a_test = model.datacollector.get_agent_vars_dataframe().reset_index()["pheromone_drop_rate"]
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+
+    plt.figure()
+    xx = np.linspace(0,1000, 10000)
+    yy = a_test[0]*np.exp(-model.schedule.agents[0].betas["A"]*xx)
+    plt.plot(xx, yy, label="correct exponential function")
+    plt.scatter(range(len(a_test)), a_test, label="modeled decay", marker='o')
+    plt.title("Exponential pheromone drop rate decay test")
+    plt.legend(loc='best')
+
+    plt.show()
+
 
 
 if __name__ == "__main__":
