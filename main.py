@@ -4,7 +4,7 @@ main.py - Part of ants project
 execute via `python main.py` in terminal or only UNIX: `./main.py`
 
 License: AGPL 3 (see end of file)
-(C) Alexander Bocken, Viviane Fahrni, Grace Kragho
+(C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
 from model import ActiveWalkerModel
 from agent import RandomWalkerAnt

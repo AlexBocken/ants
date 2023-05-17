@@ -8,7 +8,7 @@ For now it displays ant locations as well as pheromone A
 concentrations on two seperate grids
 
 License: AGPL 3 (see end of file)
-(C) Alexander Bocken, Viviane Fahrni, Grace Kragho
+(C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
 
 import numpy as np

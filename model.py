@@ -5,7 +5,7 @@ This file implements the mesa model on which our ActiveRandomWalkerAnts
 will act
 
 License: AGPL 3 (see end of file)
-(C) Alexander Bocken, Viviane Fahrni, Grace Kragho
+(C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
 
 import numpy as np
@@ -17,8 +17,6 @@ from mesa.datacollection import DataCollector
 from agent import RandomWalkerAnt
 
 class ActiveWalkerModel(Model):
-    # TODO: separate food and source into new agents?
-    # TODO: pheromone concentrations as well as agents?
     def __init__(self, width : int, height : int , num_max_agents : int,
                  num_initial_roamers : int,
                  nest_position : Coordinate,
@@ -67,6 +65,7 @@ class ActiveWalkerModel(Model):
         for key in ("A", "B"):
             field = self.grid.fields[key]
             self.grid.fields[key] =  field - self.decay_rates[key]*field
+            # TODO: plot to check whether exponential
 
         self.datacollector.collect(self)
 

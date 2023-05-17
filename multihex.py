@@ -6,7 +6,7 @@ at the same location. The base for this code comes from the MultiGrid class
 in mesa/space.py
 
 License: AGPL 3 (see end of file)
-(C) Alexander Bocken, Viviane Fahrni, Grace Kragho
+(C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
 
 from sys import dont_write_bytecode

@@ -4,7 +4,7 @@ agent.py - Part of ants project
 This model implements the actual agents on the grid (a.k.a. the ants)
 
 License: AGPL 3 (see end of file)
-(C) Alexander Bocken, Viviane Fahrni, Grace Kragho
+(C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
 import numpy as np
 import numpy.typing as npt
@@ -16,7 +16,7 @@ class RandomWalkerAnt(Agent):
                  energy_0=1,
                  chemical_drop_rate_0 : dict[str, float]={"A": 80, "B": 80},
                  sensitivity_0=0.99,
-                 alpha=0.5, drop_chemical=None,
+                 alpha=0.6, drop_chemical=None,
                  betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
                  sensitivity_decay_rate=0.01,
                  sensitivity_max = 1
