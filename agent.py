@@ -88,6 +88,7 @@ class RandomWalkerAnt(Agent):
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_food(neighbor):
                     self.drop_pheromone = "B"
+                    self.look_for_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
                     self.prev_pos = neighbor
@@ -100,17 +101,16 @@ class RandomWalkerAnt(Agent):
                     self.drop_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
-                    #TODO: Do we flip the ant here or reset prev pos?
-                    # For now, flip ant just like at food
                     self.prev_pos = neighbor
                     self._next_pos = self.pos
 
                     # recruit new ants
                     for agent_id in self.model.get_unique_ids(self.model.num_new_recruits):
-                        agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_pheromone="B", drop_pheromone="A")
-                        agent._next_pos = self.pos
-                        self.model.schedule.add(agent)
-                        self.model.grid.place_agent(agent, pos=neighbor)
+                        if self.model.schedule.get_agent_count() <  self.model.num_max_agents:
+                            agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_pheromone="B", drop_pheromone="A")
+                            agent._next_pos = self.pos
+                            self.model.schedule.add(agent)
+                            self.model.grid.place_agent(agent, pos=neighbor)
 
         # follow positive gradient
         if self.look_for_pheromone is not None:
@@ -176,7 +176,9 @@ class RandomWalkerAnt(Agent):
         assert(self.prev_pos is not None)
         all_neighbors = self.neighbors()
         neighbors_at_the_back = self.neighbors(pos=self.prev_pos, include_center=True)
-        return list(filter(lambda i: i not in neighbors_at_the_back, all_neighbors))
+        front_neighbors = list(filter(lambda i: i not in neighbors_at_the_back, all_neighbors))
+        assert(len(front_neighbors) == 3) # not sure whether always the case, used for debugging
+        return front_neighbors
 
     @property
     def front_neighbor(self):

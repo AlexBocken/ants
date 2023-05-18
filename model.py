@@ -39,9 +39,10 @@ class ActiveWalkerModel(Model):
                                                }
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
-            agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_pheromone="A", drop_pheromone="A")
-            self.schedule.add(agent)
-            self.grid.place_agent(agent, pos=nest_position)
+            if self.schedule.get_agent_count() < self.num_max_agents:
+                agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_pheromone="A", drop_pheromone="A")
+                self.schedule.add(agent)
+                self.grid.place_agent(agent, pos=nest_position)
 
         for _ in range(num_food_sources):
             self.grid.add_food(food_size)

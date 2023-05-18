@@ -11,6 +11,7 @@ from agent import RandomWalkerAnt
 import numpy as np
 import matplotlib.pyplot as plt
 from mesa.space import Coordinate
+from mesa.datacollection import DataCollector
 
 def main():
     check_pheromone_exponential_decay()
@@ -22,9 +23,6 @@ def check_pheromone_exponential_decay():
     Check whether wanted exponential decay of pheromones on grid is done correctly
     shows plot of pheromone placed on grid vs. equivalent exponential decay function
     """
-
-    from mesa.datacollection import DataCollector
-
     width = 21
     height = width
     num_initial_roamers = 0
@@ -46,9 +44,6 @@ def check_pheromone_exponential_decay():
     model.run_model()
     a_test = model.datacollector.get_model_vars_dataframe()["pheromone_a"]
 
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     plt.figure()
     xx = np.linspace(0,1000, 10000)
     yy = a_test[0]*np.exp(-model.decay_rates["A"]*xx)
@@ -66,8 +61,6 @@ def check_ant_sensitivity_linear_decay():
     shows plot of ant sensitivity placed on grid vs. equivalent linear decay function
     not food sources are on the grid for this run to not reset sensitivities
     """
-    from mesa.datacollection import DataCollector
-
     width = 50
     height = width
     num_initial_roamers = 1
@@ -91,9 +84,6 @@ def check_ant_sensitivity_linear_decay():
     model.run_model()
     a_test = model.datacollector.get_agent_vars_dataframe().reset_index()["sensitivity"]
 
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     plt.figure()
     xx = np.linspace(0,1000, 10000)
     yy = a_test[0] - start*xx
@@ -109,9 +99,6 @@ def check_ant_pheromone_exponential_decay():
     Check whether wanted exponential decay of pheromone drop rate for ants is correctly modeled
     shows plot of pheromone placed on grid vs. equivalent exponential decay function
     """
-
-    from mesa.datacollection import DataCollector
-
     width = 50
     height = width
     num_initial_roamers = 1
@@ -134,10 +121,6 @@ def check_ant_pheromone_exponential_decay():
     model.run_model()
     a_test = model.datacollector.get_agent_vars_dataframe().reset_index()["pheromone_drop_rate"]
 
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-
     plt.figure()
     xx = np.linspace(0,1000, 10000)
     yy = a_test[0]*np.exp(-model.schedule.agents[0].betas["A"]*xx)
@@ -147,8 +130,6 @@ def check_ant_pheromone_exponential_decay():
     plt.legend(loc='best')
 
     plt.show()
-
-
 
 if __name__ == "__main__":
     main()

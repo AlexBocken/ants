@@ -23,9 +23,9 @@ def setup(params=None):
     if params is None:
         params = {
                   "width": 50, "height": 50,
-                  "num_max_agents" : 100,
+                  "num_max_agents" : 1000,
                   "nest_position" : (25,25),
-                  "num_initial_roamers" : 5,
+                  "num_initial_roamers" : 20,
                   }
 
 
