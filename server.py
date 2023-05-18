@@ -23,9 +23,9 @@ def setup(params=None):
     if params is None:
         params = {
                   "width": 50, "height": 50,
-                  "num_max_agents" : 1000,
+                  "num_max_agents" : 100,
                   "nest_position" : (25,25),
-                  "num_initial_roamers" : 20,
+                  "num_initial_roamers" : 5,
                   }
 
 
@@ -127,7 +127,7 @@ def setup(params=None):
                          [lambda m: "<h3>Ant density</h3><h5>Nest: Red, Food: Green</h5>",
                           grid_ants,
                           lambda m: f"<h5>Normalization Value: {norm_ants(m)}</h5>",
-                          lambda m: "<h3>Pheromone Density</h3><h5>Pheromone A: Cyan, Pheromone B: Pink</h5>",
+                          lambda m: "<h3>Pheromone Density</h3><h5>Pheromone A: Cyan, Pheromone B: Magenta</h5>",
                           grid_pheromones,
                           lambda m: f"<h5>Normalization Value: {norm_pheromones(m)}</h5>"
                           ],
