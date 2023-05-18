@@ -12,11 +12,11 @@ from mesa.agent import Agent
 from mesa.space import Coordinate
 
 class RandomWalkerAnt(Agent):
-    def __init__(self, unique_id, model, look_for_chemical=None,
+    def __init__(self, unique_id, model, look_for_pheromone=None,
                  energy_0=1,
-                 chemical_drop_rate_0 : dict[str, float]={"A": 80, "B": 80},
+                 pheromone_drop_rate_0 : dict[str, float]={"A": 80, "B": 80},
                  sensitivity_0=0.99,
-                 alpha=0.6, drop_chemical=None,
+                 alpha=0.6, drop_pheromone=None,
                  betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
                  sensitivity_decay_rate=0.01,
                  sensitivity_max = 1
@@ -27,12 +27,12 @@ class RandomWalkerAnt(Agent):
         self._next_pos : None | Coordinate = None
         self.prev_pos : None | Coordinate = None
 
-        self.look_for_chemical = look_for_chemical
-        self.drop_chemical = drop_chemical
+        self.look_for_pheromone = look_for_pheromone
+        self.drop_pheromone = drop_pheromone
         self.energy = energy_0 #TODO: use
         self.sensitivity_0 = sensitivity_0
         self.sensitivity = self.sensitivity_0
-        self.chemical_drop_rate = chemical_drop_rate_0
+        self.pheromone_drop_rate = pheromone_drop_rate_0
         self.alpha = alpha
         self.sensitivity_max = sensitivity_max
         self.sensitivity_decay_rate = sensitivity_decay_rate
@@ -87,7 +87,8 @@ class RandomWalkerAnt(Agent):
         if self.searching_food:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_food(neighbor):
-                    self.drop_chemical = "B"
+                    self.drop_pheromone = "B"
+                    self.look_for_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
                     self.prev_pos = neighbor
@@ -96,27 +97,26 @@ class RandomWalkerAnt(Agent):
         elif self.searching_nest:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_nest(neighbor):
-                    self.look_for_chemical = "A" # Is this a correct interpretation?
-                    self.drop_chemical = "A"
+                    self.look_for_pheromone = "A" # Is this a correct interpretation?
+                    self.drop_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
-                    #TODO: Do we flip the ant here or reset prev pos?
-                    # For now, flip ant just like at food
                     self.prev_pos = neighbor
                     self._next_pos = self.pos
 
                     # recruit new ants
                     for agent_id in self.model.get_unique_ids(self.model.num_new_recruits):
-                        agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_chemical="B", drop_chemical="A")
-                        agent._next_pos = self.pos
-                        self.model.schedule.add(agent)
-                        self.model.grid.place_agent(agent, pos=neighbor)
+                        if self.model.schedule.get_agent_count() <  self.model.num_max_agents:
+                            agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_pheromone="B", drop_pheromone="A")
+                            agent._next_pos = self.pos
+                            self.model.schedule.add(agent)
+                            self.model.grid.place_agent(agent, pos=neighbor)
 
         # follow positive gradient
-        if self.look_for_chemical is not None:
-            front_concentration = [self.model.grid.fields[self.look_for_chemical][cell] for cell in self.front_neighbors ]
-            front_concentration = self.sens_adj(front_concentration, self.look_for_chemical)
-            current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_chemical][self.pos], self.look_for_chemical)
+        if self.look_for_pheromone is not None:
+            front_concentration = [self.model.grid.fields[self.look_for_pheromone][cell] for cell in self.front_neighbors ]
+            front_concentration = self.sens_adj(front_concentration, self.look_for_pheromone)
+            current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_pheromone][self.pos], self.look_for_pheromone)
             gradient = front_concentration - np.repeat(current_pos_concentration, 3)
             index = np.argmax(gradient)
             if gradient[index] > 0:
@@ -138,19 +138,19 @@ class RandomWalkerAnt(Agent):
     def step(self):
         self.sensitivity -= self.sensitivity_decay_rate
         self._choose_next_pos()
-        self._adjust_chemical_drop_rate()
+        self._adjust_pheromone_drop_rate()
 
-    def _adjust_chemical_drop_rate(self):
-        if(self.drop_chemical is not None):
-            self.chemical_drop_rate[self.drop_chemical] -= self.chemical_drop_rate[self.drop_chemical] * self.betas[self.drop_chemical]
+    def _adjust_pheromone_drop_rate(self):
+        if(self.drop_pheromone is not None):
+            self.pheromone_drop_rate[self.drop_pheromone] -= self.pheromone_drop_rate[self.drop_pheromone] * self.betas[self.drop_pheromone]
 
-    def drop_chemicals(self) -> None:
+    def drop_pheromones(self) -> None:
         # should only be called in advance() as we do not use hidden fields
-        if self.drop_chemical is not None:
-            self.model.grid.fields[self.drop_chemical][self.pos] += self.chemical_drop_rate[self.drop_chemical]
+        if self.drop_pheromone is not None:
+            self.model.grid.fields[self.drop_pheromone][self.pos] += self.pheromone_drop_rate[self.drop_pheromone]
 
     def advance(self) -> None:
-        self.drop_chemicals()
+        self.drop_pheromones()
         self.prev_pos = self.pos
         self.model.grid.move_agent(self, self._next_pos)
 
@@ -162,11 +162,11 @@ class RandomWalkerAnt(Agent):
 
     @property
     def searching_nest(self) -> bool:
-        return self.drop_chemical == "B"
+        return self.drop_pheromone == "B"
 
     @property
     def searching_food(self) -> bool:
-        return self.drop_chemical == "A"
+        return self.drop_pheromone == "A"
 
     @property
     def front_neighbors(self):
@@ -176,7 +176,9 @@ class RandomWalkerAnt(Agent):
         assert(self.prev_pos is not None)
         all_neighbors = self.neighbors()
         neighbors_at_the_back = self.neighbors(pos=self.prev_pos, include_center=True)
-        return list(filter(lambda i: i not in neighbors_at_the_back, all_neighbors))
+        front_neighbors = list(filter(lambda i: i not in neighbors_at_the_back, all_neighbors))
+        assert(len(front_neighbors) == 3) # not sure whether always the case, used for debugging
+        return front_neighbors
 
     @property
     def front_neighbor(self):
