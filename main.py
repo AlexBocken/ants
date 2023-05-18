@@ -13,10 +13,13 @@ import matplotlib.pyplot as plt
 from mesa.space import Coordinate
 from mesa.datacollection import DataCollector
 
+from multihex import MultiHexGrid
+
 def main():
     check_pheromone_exponential_decay()
     check_ant_sensitivity_linear_decay()
     check_ant_pheromone_exponential_decay()
+    check_ants_follow_gradient()
 
 def check_pheromone_exponential_decay():
     """
@@ -130,6 +133,51 @@ def check_ant_pheromone_exponential_decay():
     plt.legend(loc='best')
 
     plt.show()
+
+def check_ants_follow_gradient():
+    """
+    Create a path of neighbours with a static gradient.
+    Observe whether ant correctly follows gradient once found. via matrix printouts
+    8 = ant
+    anything else: pheromone A density.
+    The ant does not drop any new pheromones for this test
+    """
+    width, height = 20,20
+    params = {
+            "width": width, "height": height,
+            "num_max_agents": 1,
+            "num_food_sources": 0,
+            "nest_position": (10,10),
+            "num_initial_roamers": 1,
+            }
+    model = ActiveWalkerModel(**params)
+    def place_line(grid : MultiHexGrid, start_pos=None):
+        strength = 5
+        if start_pos is None:
+            start_pos = (9,9)
+        next_pos = start_pos
+        for _ in range(width):
+            grid.fields["A"][next_pos] = strength
+            strength += 0.01
+            next_pos = grid.get_neighborhood(next_pos)[0]
+
+    place_line(model.grid)
+
+    ant = model.schedule._agents[0]
+    ant.looking_for_pheromone = "A"
+    ant.drop_pheromone = None
+    ant.threshold["A"] = 0
+    ant.sensitivity_max = 100
+    #model.grid.fields["A"] = np.diag(np.ones(width))
+    model.decay_rates["A"] = 0
+
+    while model.schedule.steps < 100:
+        display_field = np.copy(model.grid.fields["A"])
+        display_field[ant.pos] = 8
+        print(display_field)
+        print(20*"#")
+        model.step()
+
 
 if __name__ == "__main__":
     main()

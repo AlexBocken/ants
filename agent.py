@@ -19,13 +19,13 @@ class RandomWalkerAnt(Agent):
                  alpha=0.6, drop_pheromone=None,
                  betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
                  sensitivity_decay_rate=0.01,
-                 sensitivity_max = 1
+                 sensitivity_max = 300
                  ) -> None:
 
         super().__init__(unique_id=unique_id, model=model)
 
         self._next_pos : None | Coordinate = None
-        self.prev_pos : None | Coordinate = None
+        self._prev_pos : None | Coordinate = None
 
         self.look_for_pheromone = look_for_pheromone
         self.drop_pheromone = drop_pheromone
@@ -37,7 +37,7 @@ class RandomWalkerAnt(Agent):
         self.sensitivity_max = sensitivity_max
         self.sensitivity_decay_rate = sensitivity_decay_rate
         self.betas = betas
-        self.threshold : dict[str, float] = {"A": 1, "B": 1}
+        self.threshold : dict[str, float] = {"A": 0, "B": 0}
 
 
     def sens_adj(self, props, key) -> npt.NDArray[np.float_] | float:
@@ -79,9 +79,11 @@ class RandomWalkerAnt(Agent):
         return np.array(arr)
 
     def _choose_next_pos(self):
-        if self.prev_pos is None:
+        if self._prev_pos is None:
             i = np.random.choice(range(6))
+            assert(self.pos is not self.neighbors()[i])
             self._next_pos = self.neighbors()[i]
+            self._prev_pos = self.pos
             return
 
         if self.searching_food:
@@ -91,7 +93,7 @@ class RandomWalkerAnt(Agent):
                     self.look_for_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
-                    self.prev_pos = neighbor
+                    self._prev_pos = neighbor
                     self._next_pos = self.pos
 
         elif self.searching_nest:
@@ -101,7 +103,7 @@ class RandomWalkerAnt(Agent):
                     self.drop_pheromone = "A"
                     self.sensitivity = self.sensitivity_0
 
-                    self.prev_pos = neighbor
+                    self._prev_pos = neighbor
                     self._next_pos = self.pos
 
                     # recruit new ants
@@ -117,22 +119,26 @@ class RandomWalkerAnt(Agent):
             front_concentration = [self.model.grid.fields[self.look_for_pheromone][cell] for cell in self.front_neighbors ]
             front_concentration = self.sens_adj(front_concentration, self.look_for_pheromone)
             current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_pheromone][self.pos], self.look_for_pheromone)
-            gradient = front_concentration - np.repeat(current_pos_concentration, 3)
+            gradient = front_concentration - np.repeat(current_pos_concentration, 3).astype(np.float_)
+            # TODO: if two or more neighbors have same concentration randomize? Should be unlikely with floats though
             index = np.argmax(gradient)
             if gradient[index] > 0:
                 self._next_pos = self.front_neighbors[index]
+                self._prev_pos = self.pos
                 return
 
         # do biased random walk
         p = np.random.uniform()
         if p < self.alpha:
             self._next_pos = self.front_neighbor
+            self._prev_pos = self.pos
         else:
             # need copy() as we would otherwise remove the tuple from all possible lists (aka python "magic")
             other_neighbors = self.neighbors().copy()
             other_neighbors.remove(self.front_neighbor)
             random_index = np.random.choice(range(len(other_neighbors)))
             self._next_pos = other_neighbors[random_index]
+            self._prev_pos = self.pos
 
 
     def step(self):
@@ -151,8 +157,8 @@ class RandomWalkerAnt(Agent):
 
     def advance(self) -> None:
         self.drop_pheromones()
-        self.prev_pos = self.pos
         self.model.grid.move_agent(self, self._next_pos)
+        self._next_pos = None # so that we rather crash than use wrong data
 
     # TODO: find out how to decorate with property properly
     def neighbors(self, pos=None, include_center=False):
@@ -173,12 +179,25 @@ class RandomWalkerAnt(Agent):
         """
         returns all three neighbors which the ant can see
         """
-        assert(self.prev_pos is not None)
         all_neighbors = self.neighbors()
-        neighbors_at_the_back = self.neighbors(pos=self.prev_pos, include_center=True)
+        neighbors_at_the_back = self.neighbors(pos=self._prev_pos, include_center=True)
         front_neighbors = list(filter(lambda i: i not in neighbors_at_the_back, all_neighbors))
-        assert(len(front_neighbors) == 3) # not sure whether always the case, used for debugging
-        return front_neighbors
+
+        ########## DEBUG
+        try:
+            assert(self._prev_pos is not None)
+            assert(self._prev_pos is not self.pos)
+            assert(self._prev_pos in all_neighbors)
+            assert(len(front_neighbors) == 3)
+        except AssertionError:
+            print(f"{self._prev_pos=}")
+            print(f"{self.pos=}")
+            print(f"{all_neighbors=}")
+            print(f"{neighbors_at_the_back=}")
+            print(f"{front_neighbors=}")
+            raise AssertionError
+        else:
+            return front_neighbors
 
     @property
     def front_neighbor(self):
@@ -186,11 +205,11 @@ class RandomWalkerAnt(Agent):
         returns neighbor of current pos
         which is towards the front of the ant
         """
-        neighbors_prev_pos = self.neighbors(self.prev_pos)
+        neighbors__prev_pos = self.neighbors(self._prev_pos)
         for candidate in self.front_neighbors:
-            # neighbor in front direction only shares current pos as neighborhood with prev_pos
+            # neighbor in front direction only shares current pos as neighborhood with _prev_pos
             candidate_neighbors = self.model.grid.get_neighborhood(candidate)
-            overlap = [x for x in candidate_neighbors if x in neighbors_prev_pos]
+            overlap = [x for x in candidate_neighbors if x in neighbors__prev_pos]
             if len(overlap) == 1:
                 return candidate
 

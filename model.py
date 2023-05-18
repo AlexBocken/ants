@@ -22,7 +22,8 @@ class ActiveWalkerModel(Model):
                  nest_position : Coordinate,
                  num_food_sources=5,
                  food_size=10,
-                 max_steps:int=1000) -> None:
+                 max_steps:int=1000,
+                 ) -> None:
         super().__init__()
         fields=["A", "B", "nests", "food"]
         self.schedule = SimultaneousActivation(self)
@@ -68,7 +69,6 @@ class ActiveWalkerModel(Model):
         for key in ("A", "B"):
             field = self.grid.fields[key]
             self.grid.fields[key] =  field - self.decay_rates[key]*field
-            # TODO: plot to check whether exponential
 
         self.datacollector.collect(self)
 
