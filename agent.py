@@ -19,7 +19,9 @@ class RandomWalkerAnt(Agent):
                  alpha=0.6, drop_pheromone=None,
                  betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
                  sensitivity_decay_rate=0.01,
-                 sensitivity_max = 300
+                 sensitivity_max = 300,
+                 sensitivity_min = 0.001,
+                 sensitivity_steepness = 1
                  ) -> None:
 
         super().__init__(unique_id=unique_id, model=model)
@@ -35,9 +37,12 @@ class RandomWalkerAnt(Agent):
         self.pheromone_drop_rate = pheromone_drop_rate_0
         self.alpha = alpha
         self.sensitivity_max = sensitivity_max
+        self.sensitivity_min = sensitivity_min
         self.sensitivity_decay_rate = sensitivity_decay_rate
+        self.sensitivity_steepness = sensitivity_steepness
         self.betas = betas
         self.threshold : dict[str, float] = {"A": 0, "B": 0}
+        
 
 
     def sens_adj(self, props, key) -> npt.NDArray[np.float_] | float:
@@ -60,18 +65,50 @@ class RandomWalkerAnt(Agent):
                     |
                    0|________
                     -----------------------> prop
+        For the nonlinear sensitivity, the idea is to use a logistic function that has
+        a characteristic sigmoidal shape that starts from a low value, increases rapidly,
+        and then gradually approaches a saturation level.
+
+        f(x) = L / (1 + exp(-k*(x - x0)))
+
+        f(x) = return value
+        L = sens_max
+        k is a parameter that controls the steepness of the curve. We can start with 1
+        A higher value of k leads to a steeper curve.
+        x0 is the midpoint of the curve, where the sensitivity starts to increase significantly.
+        We can make X0 the threshold value
+
+
         """
         # if props iterable create array, otherwise return single value
         try:
             iter(props)
         except TypeError:
-            # TODO: proper nonlinear response, not just clamping
-            if props > self.sensitivity_max:
-                return self.sensitivity_max
-            if props > self.threshold[key]:
-                return props
+            #TODO: proper nonlinear response, not just clamping
+            
+            non_linear_sens = True
+            if non_linear_sens:
+                L = self.sensitivity_max
+                k = self.sensitivity_steepness
+                mid = self.threshold[key]
+                if props > self.sensitivity_max:
+                    return self.sensitivity_max 
+                
+                #Should we still keep these conditions?
+                # if props > self.threshold[key]:
+                #     return props 
+                else:
+                    adjusted_sensitivity = L / (1 + np.exp(-k * (props - mid)))
+                    print(f'props: {props}, adjusted_value: {adjusted_sensitivity}')
+                    return adjusted_sensitivity
             else:
-                return 0
+                if props > self.sensitivity_max:
+                    return self.sensitivity_max #Should we still keep these conditions
+                if props > self.threshold[key]:
+                    return props 
+                else:
+                    return 0               
+            
 
         arr : list[float] = []
         for prop in props:
@@ -146,6 +183,10 @@ class RandomWalkerAnt(Agent):
         self._choose_next_pos()
         self._adjust_pheromone_drop_rate()
 
+        #kill agent if sensitivity is low
+        if self.sensitivity < self.sensitivity_min: 
+            self._kill_agent()
+
     def _adjust_pheromone_drop_rate(self):
         if(self.drop_pheromone is not None):
             self.pheromone_drop_rate[self.drop_pheromone] -= self.pheromone_drop_rate[self.drop_pheromone] * self.betas[self.drop_pheromone]
@@ -154,6 +195,11 @@ class RandomWalkerAnt(Agent):
         # should only be called in advance() as we do not use hidden fields
         if self.drop_pheromone is not None:
             self.model.grid.fields[self.drop_pheromone][self.pos] += self.pheromone_drop_rate[self.drop_pheromone]
+
+    def _kill_agent(self):
+        #update dead_agent list 
+        self.model.dead_agents.append(self)
+
 
     def advance(self) -> None:
         self.drop_pheromones()

@@ -38,6 +38,8 @@ class ActiveWalkerModel(Model):
         self.decay_rates : dict[str, float] = {"A" :0.01,
                                                "B": 0.01,
                                                }
+        
+        self.dead_agents = []
 
         for agent_id in self.get_unique_ids(num_initial_roamers):
             if self.schedule.get_agent_count() < self.num_max_agents:
@@ -74,6 +76,14 @@ class ActiveWalkerModel(Model):
 
         if self.schedule.steps >= self.max_steps:
             self.running = False
+        
+        #remove dead agents
+        for agent in self.dead_agents:
+            self.schedule.remove(agent)
+            self.grid.remove_agent(agent)
+            self.dead_agents.remove(agent)
+        self.dead_agents = []
+        #ToDo what happens when all agents die
 
     def get_unique_id(self) -> int:
         self._unique_id_counter += 1
