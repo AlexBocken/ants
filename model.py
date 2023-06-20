@@ -16,40 +16,131 @@ from mesa.time import SimultaneousActivation
 from mesa.datacollection import DataCollector
 from agent import RandomWalkerAnt
 
+kwargs_paper_setup1 = {
+        "width": 100,
+        "height": 100,
+        "N_0": 20,
+        "N_m": 100,
+        "N_r": 5,
+        "alpha": 0.6,
+        "gamma": 0.001,
+        "beta": 0.0512,
+        "d_s": 0.001,
+        "d_e": 0.001,
+        "s_0": 0.99,
+        "e_0": 0.99,
+        "q_0": 80,
+        "q_tr": 1,
+        "e_min": 0,
+        "nest_position": (49,49),
+        "N_f": 5,
+        "food_size" : 55,
+        "max_steps": 8000,
+        "resistance_map_type" : None,
+}
+
+kwargs_paper_setup2 = {
+        "width": 100,
+        "height": 100,
+        "N_0": 20,
+        "N_m": 100,
+        "N_r": 5,
+        "alpha": 0.6,
+        "gamma": 0.01,
+        "beta": 0.0512,
+        "d_s": 0.001,
+        "d_e": 0.001,
+        "s_0": 0.99,
+        "e_0": 0.99,
+        "q_0": 80,
+        "q_tr": 1,
+        "e_min": 0,
+        "nest_position": (49,49),
+        "N_f": 5,
+        "food_size" : 550,
+        "max_steps": 8000,
+        "resistance_map_type" : None,
+}
+
 class ActiveWalkerModel(Model):
-    def __init__(self, width : int, height : int , num_max_agents : int,
-                 num_initial_roamers : int,
+    def __init__(self, width : int, height : int,
+                 N_0 : int, # number of initial roamers
+                 N_m : int, # max number of ants
+                 N_r : int, # number of new recruits
+                 alpha : float, #biased random walk
+                 beta : float, # decay rate drop rate
+                 gamma : float, # decay rate pheromone concentration fields
+                 d_s : float, # decay rate sensitvity
+                 d_e : float, # decay rate energy
+                 s_0 : float, # sensitvity reset
+                 e_0 : float, # energy reset
+                 q_0 : float,  # initial pheromone level
+                 q_tr : float, # threshold under which ant cannot distinguish concentrations
+                 e_min : float, # energy at which walker dies
                  nest_position : Coordinate,
-                 num_food_sources=5,
-                 food_size=10,
+                 N_f=5, #num food sources
+                 food_size= 55,
                  max_steps:int=1000,
+                 resistance_map_type=None,
                  ) -> None:
         super().__init__()
-        fields=["A", "B", "nests", "food"]
+
+        self.N_m : int       = N_m   # max number of ants
+        self.N_r : int       = N_r   # number of new recruits
+        self.alpha : float   = alpha # biased random walk if no gradient
+        self.gamma : float   = gamma # decay rate pheromone concentration fields
+        self.beta : float    = beta  # decay rate drop rate
+        self.d_s : float     = d_s   # decay rate sensitvity
+        self.d_e : float     = d_e   # decay rate energy (get's multiplied with resistance)
+        self.s_0 : float     = s_0   # sensitvity reset
+        self.e_0 : float     = e_0   # energy reset
+        self.q_0 : float     = q_0   # pheromone drop rate reset
+        self.q_tr : float    = q_tr  # threshold under which ant cannot distinguish concentrations
+        self.e_min : float   = e_min # energy at which walker dies
+        self.N_f : int       = N_f #num food sources
+
+        fields=["A", "B", "nests", "food", "res"]
         self.schedule = SimultaneousActivation(self)
         self.grid = MultiHexGridScalarFields(width=width, height=height, torus=True, fields=fields)
+
+        if resistance_map_type is None:
+            self.grid.fields["res"] = np.ones((width, height)).astype(float)
+        elif resistance_map_type == "perlin":
+            # perlin generates isotropic noise which may or may not be a good choice
+            # pip3 install git+https://github.com/pvigier/perlin-numpy
+            from perlin_numpy import (
+                generate_fractal_noise_2d,
+                generate_perlin_noise_2d,
+            )
+            noise = generate_perlin_noise_2d(shape=(width,height), res=((10,10)))
+            normalized_noise = (noise - np.min(noise))/(np.max(noise) - np.min(noise))
+            self.grid.fields["res"] = normalized_noise
+        else:
+            # possible other noise types: simplex or value
+            raise NotImplemented(f"{resistance_map_type=} is not implemented.")
+
+
+
+
         self._unique_id_counter = -1
 
         self.max_steps = max_steps
         self.grid.add_nest(nest_position)
-        self.num_max_agents = num_max_agents
-        self.num_new_recruits = 5
 
-        self.decay_rates : dict[str, float] = {"A" :0.01,
-                                               "B": 0.01,
-                                               }
-
-        for agent_id in self.get_unique_ids(num_initial_roamers):
-            if self.schedule.get_agent_count() < self.num_max_agents:
+        for agent_id in self.get_unique_ids(N_0):
+            if self.schedule.get_agent_count() < self.N_m:
                 agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_pheromone="A", drop_pheromone="A")
                 self.schedule.add(agent)
                 self.grid.place_agent(agent, pos=nest_position)
 
-        for _ in range(num_food_sources):
+        for _ in range(N_f):
             self.grid.add_food(food_size)
 
         self.datacollector = DataCollector(
-                model_reporters={},
+                # model_reporters={"agent_dens": lambda m: m.agent_density()},
+                model_reporters = {"pheromone_a": lambda m: m.grid.fields["A"],
+                                    "pheromone_b": lambda m: m.grid.fields["B"],
+                                   },
                 agent_reporters={}
                 )
         self.datacollector.collect(self) # keep at end of __init___
@@ -68,7 +159,7 @@ class ActiveWalkerModel(Model):
         # apply decay rate on pheromone levels
         for key in ("A", "B"):
             field = self.grid.fields[key]
-            self.grid.fields[key] =  field - self.decay_rates[key]*field
+            self.grid.fields[key] =  field - self.gamma*field
 
         self.datacollector.collect(self)
 

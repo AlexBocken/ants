@@ -22,10 +22,12 @@ def setup(params=None):
     # Set the model parameters
     if params is None:
         params = {
+                  "max_steps": 3000,
                   "width": 50, "height": 50,
-                  "num_max_agents" : 100,
+                  "N_m" : 100,
                   "nest_position" : (25,25),
-                  "num_initial_roamers" : 5,
+                  "N_0" : 5,
+                  "resistance_map_type": "perlin",
                   }
 
 
@@ -85,12 +87,9 @@ def setup(params=None):
             "Color":  col,
         }
 
-    def get_max_grid_val(model, key):
-        return np.max(model.grid.fields[key])
-
-    def portray_pheromone_density(model, pos, norm):
-        col_a = get_color(level=model.grid.fields["A"][pos], normalization=norm)
-        col_b = get_color(level=model.grid.fields["B"][pos], normalization=norm)
+    def portray_resistance_map(model, pos, norm=1):
+        col = get_color(level=model.grid.fields['res'][pos], normalization=norm)
+        col = f"rgb({col}, {col}, {col})"
         return {
             "Shape": "hex",
             "r": 1,
@@ -98,7 +97,26 @@ def setup(params=None):
             "Layer": 0,
             "x": pos[0],
             "y": pos[1],
-            "Color": f"rgb({col_a}, {col_b}, 255)"
+            "Color":  col,
+        }
+
+    def get_max_grid_val(model, key):
+        return np.max(model.grid.fields[key])
+
+    def portray_pheromone_density(model, pos, norm):
+        col_a = get_color(level=model.grid.fields["A"][pos], normalization=norm)
+        col_b = get_color(level=model.grid.fields["B"][pos], normalization=norm)
+        res_min, res_max = np.min(model.grid.fields['res']), np.max(model.grid.fields['res'])
+        ease = 1 - model.grid.fields['res'][pos]
+        col_ease = get_color(level=ease, normalization=np.max(model.grid.fields['res']))
+        return {
+            "Shape": "hex",
+            "r": 1,
+            "Filled": "true",
+            "Layer": 0,
+            "x": pos[0],
+            "y": pos[1],
+            "Color": f"rgb({col_a}, {col_b}, {col_ease})"
         }
 
 
@@ -109,6 +127,9 @@ def setup(params=None):
     grid_ants = CanvasHexGridMultiAgents(portray_ant_density,
                                 width, height, width*pixel_ratio, height*pixel_ratio,
                                 norm_method=lambda m: 5)
+    grid_resistance_map = CanvasHexGridMultiAgents(portray_resistance_map,
+                                width, height, width*pixel_ratio, height*pixel_ratio,
+                                norm_method=lambda m: 1)
 
     def norm_ants(model):
         return 5
@@ -127,14 +148,19 @@ def setup(params=None):
                          [lambda m: "<h3>Ant density</h3><h5>Nest: Red, Food: Green</h5>",
                           grid_ants,
                           lambda m: f"<h5>Normalization Value: {norm_ants(m)}</h5>",
-                          lambda m: "<h3>Pheromone Density</h3><h5>Pheromone A: Cyan, Pheromone B: Magenta</h5>",
+                          lambda m: "<h3>Pheromone Density</h3><h5>Pheromone A: Cyan, Pheromone B: Magenta, Resistance Map: Yellow</h5>",
                           grid_pheromones,
-                          lambda m: f"<h5>Normalization Value: {norm_pheromones(m)}</h5>"
+                          lambda m: f"<h5>Normalization Value: {norm_pheromones(m)}</h5>",
                           ],
                            "Active Random Walker Ants", params)
 
 if __name__ == "__main__":
-    server = setup()
+    from model import kwargs_paper_setup1
+    kwargs_paper1_perlin = kwargs_paper_setup1
+    kwargs_paper1_perlin["height"] = 50
+    kwargs_paper1_perlin["width"] = 50
+    kwargs_paper1_perlin["resistance_map_type"] = "perlin"
+    server = setup(params=kwargs_paper1_perlin)
     server.launch()
 
 """

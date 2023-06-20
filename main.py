@@ -6,6 +6,7 @@ execute via `python main.py` in terminal or only UNIX: `./main.py`
 License: AGPL 3 (see end of file)
 (C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
+import array
 from model import ActiveWalkerModel
 from agent import RandomWalkerAnt
 import numpy as np
@@ -16,10 +17,11 @@ from mesa.datacollection import DataCollector
 from multihex import MultiHexGrid
 
 def main():
-    check_pheromone_exponential_decay()
-    check_ant_sensitivity_linear_decay()
-    check_ant_pheromone_exponential_decay()
-    check_ants_follow_gradient()
+    pass
+    # check_pheromone_exponential_decay()
+    # check_ant_sensitivity_linear_decay()
+    # check_ant_pheromone_exponential_decay()
+    # check_ants_follow_gradient()
 
 def check_pheromone_exponential_decay():
     """
@@ -107,6 +109,7 @@ def check_ant_pheromone_exponential_decay():
     num_initial_roamers = 1
     num_max_agents = 100
     nest_position : Coordinate = (width //2, height //2)
+    num_food_sources = 0;
     max_steps = 1000
 
     model = ActiveWalkerModel(width=width, height=height,
@@ -179,8 +182,27 @@ def check_ants_follow_gradient():
         model.step()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
+
+from model import kwargs_paper_setup1 as kwargs
+model = ActiveWalkerModel(**kwargs)
+
+from hexplot import plot_hexagon
+# a = np.zeros_like(model.grid.fields['food'])
+# a[np.nonzero(model.grid.fields['food'])] = 1
+# plot_hexagon(a, title="Nest locations")
+# plot_hexagon(model.grid.fields['res'], title="Resistance Map")
+
+
+from tqdm import tqdm as progress_bar
+for _ in progress_bar(range(model.max_steps)):
+    model.step()
+# agent_densities = model.datacollector.get_model_vars_dataframe()["agent_dens"]
+# mean_dens = np.mean(agent_densities)
+# norm_dens = mean_dens/np.max(mean_dens)
+# plot_hexagon(norm_dens, title="Ant density overall")
+# plt.show()
 
 
 

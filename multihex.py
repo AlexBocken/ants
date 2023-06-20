@@ -107,7 +107,8 @@ class MultiHexGridScalarFields(MultiHexGrid):
 
     def is_food(self, pos):
         assert('food' in self.fields.keys())
-        return bool(self.fields['food'][pos])
+        # account for potential float imprecision and use epsilon = 1e-3
+        return self.fields['food'][pos] > 1e-3
 
     def add_food(self, size : int , pos=None):
         """
@@ -127,7 +128,7 @@ class MultiHexGridScalarFields(MultiHexGrid):
             while(self.is_nest(pos) or self.is_food(pos)):
                 pos = select_random_place()
 
-        self.fields['food'][pos] = size
+        self.fields['food'][pos] = int(size)
 
     def is_nest(self, pos : Coordinate) -> bool:
         assert('nests' in self.fields.keys())

@@ -6,20 +6,22 @@ This model implements the actual agents on the grid (a.k.a. the ants)
 License: AGPL 3 (see end of file)
 (C) Alexander Bocken, Viviane Fahrni, Grace Kagho
 """
+
+"""
+TO DISCUSS:
+Is the separation of energy and sensitivity useful?
+
+"""
 import numpy as np
 import numpy.typing as npt
 from mesa.agent import Agent
 from mesa.space import Coordinate
 
 class RandomWalkerAnt(Agent):
-    def __init__(self, unique_id, model, look_for_pheromone=None,
-                 energy_0=1,
-                 pheromone_drop_rate_0 : dict[str, float]={"A": 80, "B": 80},
-                 sensitivity_0=0.99,
-                 alpha=0.6, drop_pheromone=None,
-                 betas : dict[str, float]={"A": 0.0512, "B": 0.0512},
-                 sensitivity_decay_rate=0.01,
-                 sensitivity_max = 300
+    def __init__(self, unique_id, model,
+                 look_for_pheromone=None,
+                 drop_pheromone=None,
+                 sensitivity_max = 30000,
                  ) -> None:
 
         super().__init__(unique_id=unique_id, model=model)
@@ -27,18 +29,12 @@ class RandomWalkerAnt(Agent):
         self._next_pos : None | Coordinate = None
         self._prev_pos : None | Coordinate = None
 
-        self.look_for_pheromone = look_for_pheromone
-        self.drop_pheromone = drop_pheromone
-        self.energy = energy_0 #TODO: use
-        self.sensitivity_0 = sensitivity_0
-        self.sensitivity = self.sensitivity_0
-        self.pheromone_drop_rate = pheromone_drop_rate_0
-        self.alpha = alpha
+        self.look_for_pheromone : str|None = look_for_pheromone
+        self.drop_pheromone : str|None = drop_pheromone
+        self.energy : float = self.model.e_0
+        self.sensitivity : float = self.model.s_0
+        self.pheromone_drop_rate : float = self.model.q_0
         self.sensitivity_max = sensitivity_max
-        self.sensitivity_decay_rate = sensitivity_decay_rate
-        self.betas = betas
-        self.threshold : dict[str, float] = {"A": 0, "B": 0}
-
 
     def sens_adj(self, props, key) -> npt.NDArray[np.float_] | float:
         """
@@ -68,7 +64,7 @@ class RandomWalkerAnt(Agent):
             # TODO: proper nonlinear response, not just clamping
             if props > self.sensitivity_max:
                 return self.sensitivity_max
-            if props > self.threshold[key]:
+            if props > self.model.q_tr:
                 return props
             else:
                 return 0
@@ -78,9 +74,29 @@ class RandomWalkerAnt(Agent):
             arr.append(self.sens_adj(prop, key))
         return np.array(arr)
 
+    def _get_resistance_weights(self, positions=None):
+            if positions is None:
+                positions = self.neighbors()
+            # bit round-about but self.model.grid.fields['res'][positions]
+            # gets interpreted as slices, not multiple singular positions
+            resistance = np.array([ self.model.grid.fields['res'][x,y] for x,y in positions ])
+            easiness = np.max(self.model.grid.fields['res']) - resistance + 1e-15 # + epsilon to not divide by zero
+            weights = easiness/ np.sum(easiness)
+
+            return weights
+
     def _choose_next_pos(self):
+        def _pick_from_remaining_five(remaining_five):
+            """
+            """
+            weights = self._get_resistance_weights(remaining_five)
+            random_index = np.random.choice(range(len(remaining_five)), p=weights)
+            self._next_pos = remaining_five[random_index]
+            self._prev_pos = self.pos
+
         if self._prev_pos is None:
-            i = np.random.choice(range(6))
+            weights = self._get_resistance_weights()
+            i = np.random.choice(range(6),p=weights)
             assert(self.pos is not self.neighbors()[i])
             self._next_pos = self.neighbors()[i]
             self._prev_pos = self.pos
@@ -89,71 +105,94 @@ class RandomWalkerAnt(Agent):
         if self.searching_food:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_food(neighbor):
+                    self.model.grid.fields['food'][neighbor] -= 1 # eat
+                    #resets
+                    self.pheromone_drop_rate = self.model.q_0
+                    self.sensitivity = self.model.s_0
+                    self.energy = self.model.e_0
+
+                    #now look for other pheromone
                     self.drop_pheromone = "B"
                     self.look_for_pheromone = "A"
-                    self.sensitivity = self.sensitivity_0
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
+                    return
 
         elif self.searching_nest:
             for neighbor in self.front_neighbors:
                 if self.model.grid.is_nest(neighbor):
+                    #resets
+                    self.pheromone_drop_rate = self.model.q_0
+                    self.sensitivity = self.model.s_0
+                    self.energy = self.model.e_0
+
                     self.look_for_pheromone = "A" # Is this a correct interpretation?
                     self.drop_pheromone = "A"
-                    self.sensitivity = self.sensitivity_0
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
 
                     # recruit new ants
-                    for agent_id in self.model.get_unique_ids(self.model.num_new_recruits):
-                        if self.model.schedule.get_agent_count() <  self.model.num_max_agents:
+                    for agent_id in self.model.get_unique_ids(self.model.N_r):
+                        if self.model.schedule.get_agent_count() <  self.model.N_m:
                             agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_pheromone="B", drop_pheromone="A")
                             agent._next_pos = self.pos
                             self.model.schedule.add(agent)
                             self.model.grid.place_agent(agent, pos=neighbor)
+                    return
 
-        # follow positive gradient
+        # follow positive gradient with likelihood self.sensitivity
         if self.look_for_pheromone is not None:
+            # Calculate gradient
             front_concentration = [self.model.grid.fields[self.look_for_pheromone][cell] for cell in self.front_neighbors ]
             front_concentration = self.sens_adj(front_concentration, self.look_for_pheromone)
             current_pos_concentration = self.sens_adj(self.model.grid.fields[self.look_for_pheromone][self.pos], self.look_for_pheromone)
             gradient = front_concentration - np.repeat(current_pos_concentration, 3).astype(np.float_)
-            # TODO: if two or more neighbors have same concentration randomize? Should be unlikely with floats though
+
             index = np.argmax(gradient)
             if gradient[index] > 0:
-                self._next_pos = self.front_neighbors[index]
-                self._prev_pos = self.pos
+                # follow positive gradient with likelihood self.sensitivity
+                p = np.random.uniform()
+                if p < self.sensitivity:
+                    self._next_pos = self.front_neighbors[index]
+                    self._prev_pos = self.pos
+                else:
+                    other_neighbors = self.neighbors().copy()
+                    other_neighbors.remove(self.front_neighbors[index])
+                    _pick_from_remaining_five(other_neighbors)
                 return
 
         # do biased random walk
         p = np.random.uniform()
-        if p < self.alpha:
+        # TODO: This completely neglects resistance, relevant?
+        if p < self.model.alpha:
             self._next_pos = self.front_neighbor
             self._prev_pos = self.pos
         else:
-            # need copy() as we would otherwise remove the tuple from all possible lists (aka python "magic")
             other_neighbors = self.neighbors().copy()
             other_neighbors.remove(self.front_neighbor)
-            random_index = np.random.choice(range(len(other_neighbors)))
-            self._next_pos = other_neighbors[random_index]
-            self._prev_pos = self.pos
+            _pick_from_remaining_five(other_neighbors)
 
 
     def step(self):
-        self.sensitivity -= self.sensitivity_decay_rate
-        self._choose_next_pos()
-        self._adjust_pheromone_drop_rate()
+        self.sensitivity -= self.model.d_s
+        self.energy -= self.model.grid.fields['res'][self.pos] * self.model.d_e
+        # Die and get removed if no energy
+        if self.energy < self.model.e_min:
+            self.model.schedule.remove(self)
+        else:
+            self._choose_next_pos()
+            self._adjust_pheromone_drop_rate()
 
     def _adjust_pheromone_drop_rate(self):
         if(self.drop_pheromone is not None):
-            self.pheromone_drop_rate[self.drop_pheromone] -= self.pheromone_drop_rate[self.drop_pheromone] * self.betas[self.drop_pheromone]
+            self.pheromone_drop_rate -= self.pheromone_drop_rate * self.model.beta
 
     def drop_pheromones(self) -> None:
         # should only be called in advance() as we do not use hidden fields
         if self.drop_pheromone is not None:
-            self.model.grid.fields[self.drop_pheromone][self.pos] += self.pheromone_drop_rate[self.drop_pheromone]
+            self.model.grid.fields[self.drop_pheromone][self.pos] += self.pheromone_drop_rate
 
     def advance(self) -> None:
         self.drop_pheromones()
