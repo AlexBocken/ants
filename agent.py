@@ -87,6 +87,24 @@ class RandomWalkerAnt(Agent):
             return weights
 
     def _choose_next_pos(self):
+        def _combine_weights(res_weights, walk_weights):
+            """
+            If we have a resistance -> Infinity we want to have a likelihood -> 0 for this direction
+            Therefore we should multiply our two probabilities.
+            For the case of no resistance field this will return the normal walk_weights
+            res_weights : resistance weights: based on resistance field of neighbours
+                            see _get_resistance_weights for more info
+            walk weights: In case of biased random walk (no positive pheromone gradient):
+                             forward: alpha,
+                             everywhere else: (1- alpaha)/5)
+                          In case of positive pheromone gradient present in front:
+                             max. positive gradient: self.sensitivity
+                             everyhwere else: (1-self.sensitivity)/5
+            """
+            combined = res_weights * walk_weights
+            normalized = combined / np.sum(combined)
+            return normalized
+
         def _pick_from_remaining_five(remaining_five):
             """
             """
@@ -96,7 +114,10 @@ class RandomWalkerAnt(Agent):
             self._prev_pos = self.pos
 
         if self._prev_pos is None:
-            weights = self._get_resistance_weights()
+            res_weights = self._get_resistance_weights()
+            walk_weights = np.ones(6)
+            weights = _combine_weights(res_weights, walk_weights)
+
             i = np.random.choice(range(6),p=weights)
             assert(self.pos is not self.neighbors()[i])
             self._next_pos = self.neighbors()[i]
@@ -155,28 +176,37 @@ class RandomWalkerAnt(Agent):
 
             index = np.argmax(gradient)
             if gradient[index] > 0:
-                # follow positive gradient with likelihood self.sensitivity
-                p = np.random.uniform()
-                if p < self.sensitivity:
-                    self._next_pos = self.front_neighbors[index]
-                    self._prev_pos = self.pos
-                else:
-                    other_neighbors = self.neighbors().copy()
-                    other_neighbors.remove(self.front_neighbors[index])
-                    _pick_from_remaining_five(other_neighbors)
+                # follow positive gradient with likelihood self.sensitivity * resistance_weight (re-normalized)
+
+                all_neighbors_cells = self.neighbors()
+                highest_gradient_cell = self.front_neighbors[index]
+                highest_gradient_index_arr = np.where(all_neighbors_cells == highest_gradient_cell)
+                assert(len(highest_gradient_index_arr) == 1)
+
+                all_neighbors_index = highest_gradient_index_arr[0]
+                sens_weights = np.ones(6) * (1-self.sensitivity)/5
+                sens_weights[all_neighbors_index] = self.sensitivity
+
+                res_weights = self._get_resistance_weights()
+                weights = _combine_weights(res_weights, sens_weights)
+
+                self._next_pos = np.random.choice(all_neighbors_cells, p=weights)
+                self._prev_pos = self.pos
                 return
 
         # do biased random walk
-        p = np.random.uniform()
-        # TODO: This completely neglects resistance, relevant?
-        if p < self.model.alpha:
-            self._next_pos = self.front_neighbor
-            self._prev_pos = self.pos
-        else:
-            other_neighbors = self.neighbors().copy()
-            other_neighbors.remove(self.front_neighbor)
-            _pick_from_remaining_five(other_neighbors)
+        all_neighbors_cells = self.neighbors()
+        front_index_arr = np.where(all_neighbors_cells == self.front_neighbor)
+        assert(len(front_index_arr) == 1 )
+        front_index = front_index_arr[0]
 
+        res_weights = self._get_resistance_weights()
+        walk_weights = np.ones(6) * (1-self.model.alpha) / 5
+        walk_weights[front_index] = self.model.alpha
+
+        weights = _combine_weights(res_weights, walk_weights)
+        self._nex_pos = np.random.choice(all_neighbors_cells, p=weights)
+        self._prev_pos = self.pos
 
     def step(self):
         self.sensitivity -= self.model.d_s

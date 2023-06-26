@@ -107,16 +107,18 @@ class ActiveWalkerModel(Model):
         self.grid = MultiHexGridScalarFields(width=width, height=height, torus=True, fields=fields)
 
         if resistance_map_type is None:
+            print("No resistance field")
             self.grid.fields["res"] = np.ones((width, height)).astype(float)
         elif resistance_map_type == "perlin":
-            # perlin generates isotropic noise which may or may not be a good choice
+            # perlin generates anisotropic noise which may or may not be a good choice
             # pip3 install git+https://github.com/pvigier/perlin-numpy
             from perlin_numpy import (
                 generate_fractal_noise_2d,
                 generate_perlin_noise_2d,
             )
             noise = generate_perlin_noise_2d(shape=(width,height), res=((10,10)))
-            normalized_noise = (noise - np.min(noise))/(np.max(noise) - np.min(noise))
+            # normalized to mean=1, min=0, and max=2
+            normalized_noise = (noise - np.min(noise))/(np.max(noise) - np.min(noise)) * 2
             self.grid.fields["res"] = normalized_noise
         else:
             # possible other noise types: simplex or value
