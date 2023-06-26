@@ -270,23 +270,23 @@ plt.show()
 # |%%--%%| <mgJWQ0bqG1|64kmoHYvCD>
 
  # Connectivity measure
-        def check_food_source_connectivity(food_sources, paths): #food_sources = nodes.is_nest, paths=result from BFS
-            connected_food_sources = set()
-    
-            for source in food_sources:
-                if source in paths:
-                    connected_food_sources.add(source)
-            
-            connectivity = len(connected_food_sources)
-    
-    
-            return connectivity
-    
-        
-        # Calculate connectivity through BFS
-        
-        current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
-         
+def check_food_source_connectivity(food_sources, paths): #food_sources = nodes.is_nest, paths=result from BFS
+    connected_food_sources = set()
+
+    for source in food_sources:
+        if source in paths:
+            connected_food_sources.add(source)
+
+    connectivity = len(connected_food_sources)
+
+
+    return connectivity
+
+
+    # Calculate connectivity through BFS
+
+    current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
+
 
 # |%%--%%| <64kmoHYvCD|JEzmDy4wuX>
 
@@ -298,12 +298,10 @@ plt.show()
 
 
 
-         
+
 
 # |%%--%%| <U9vmSFZUyD|r0xVXEqlAh>
 
 
 
 # |%%--%%| <r0xVXEqlAh|6K80EwwmVN>
-
-
