@@ -103,7 +103,7 @@ class RandomWalkerAnt(Agent):
             """
             combined = res_weights * walk_weights
             normalized = combined / np.sum(combined)
-            return normalized
+            return list(normalized)
 
         def _pick_from_remaining_five(remaining_five):
             """
@@ -190,7 +190,9 @@ class RandomWalkerAnt(Agent):
                 res_weights = self._get_resistance_weights()
                 weights = _combine_weights(res_weights, sens_weights)
 
-                self._next_pos = np.random.choice(all_neighbors_cells, p=weights)
+                random_index = np.random.choice(range(6), p=weights)
+                self._next_pos = all_neighbors_cells[random_index]
+
                 self._prev_pos = self.pos
                 return
 
@@ -205,7 +207,9 @@ class RandomWalkerAnt(Agent):
         walk_weights[front_index] = self.model.alpha
 
         weights = _combine_weights(res_weights, walk_weights)
-        self._nex_pos = np.random.choice(all_neighbors_cells, p=weights)
+
+        random_index = np.random.choice(range(6), p=weights)
+        self._next_pos = all_neighbors_cells[random_index]
         self._prev_pos = self.pos
 
     def step(self):

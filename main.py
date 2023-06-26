@@ -180,21 +180,16 @@ if __name__ == "__main__":
     print(kwargs)
     model = ActiveWalkerModel(**kwargs)
 
-    # from hexplot import plot_hexagon
-    # a = np.zeros_like(model.grid.fields['food'])
-    # a[np.nonzero(model.grid.fields['food'])] = 1
-    # plot_hexagon(a, title="Nest locations")
-    # plot_hexagon(model.grid.fields['res'], title="Resistance Map")
+    from hexplot import plot_hexagon
+    a = np.zeros_like(model.grid.fields['food'])
+    a[np.nonzero(model.grid.fields['food'])] = 1
+    plot_hexagon(a, title="Nest locations")
+    plot_hexagon(model.grid.fields['res'], title="Resistance Map")
 
 
-    # from tqdm import tqdm as progress_bar
-    #for _ in progress_bar(range(model.max_steps)):
-    # model.step()
-    # agent_densities = model.datacollector.get_model_vars_dataframe()["agent_dens"]
-    # mean_dens = np.mean(agent_densities)
-    # norm_dens = mean_dens/np.max(mean_dens)
-    # plot_hexagon(norm_dens, title="Ant density overall")
-    # plt.show()
+    from tqdm import tqdm as progress_bar
+    for _ in progress_bar(range(model.max_steps)):
+        model.step()
 
 
 
