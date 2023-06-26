@@ -113,8 +113,8 @@ class RandomWalkerAnt(Agent):
                     self.energy = self.model.e_0
 
                     #now look for other pheromone
-                    self.drop_pheromone = "B"
                     self.look_for_pheromone = "A"
+                    self.drop_pheromone = "B"
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
@@ -133,6 +133,7 @@ class RandomWalkerAnt(Agent):
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
+                    self.model.successful_ants += 1
 
 
                     # recruit new ants

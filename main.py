@@ -187,6 +187,7 @@ def check_ants_follow_gradient():
 #     main()
 
 from model import kwargs_paper_setup1 as kwargs
+# kwargs["N_m"] = 10000
 model = ActiveWalkerModel(**kwargs)
 
 from hexplot import plot_hexagon

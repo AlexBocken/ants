@@ -100,6 +100,7 @@ class ActiveWalkerModel(Model):
         self.q_tr : float    = q_tr  # threshold under which ant cannot distinguish concentrations
         self.e_min : float   = e_min # energy at which walker dies
         self.N_f : int       = N_f #num food sources
+        self.successful_ants = 0    # for viviane's graph
 
         fields=["A", "B", "nests", "food", "res"]
         self.schedule = SimultaneousActivation(self)
@@ -135,7 +136,7 @@ class ActiveWalkerModel(Model):
 
         for _ in range(N_f):
             self.grid.add_food(food_size)
- 
+
 
         # Breadth-first-search algorithm for connectivity
         #def bfs(graph, start_node, threshold): #graph=grid, start_node=nest, threshold=TBD?
@@ -143,7 +144,7 @@ class ActiveWalkerModel(Model):
          #   queue = deque([(start_node, [])])
          #   paths = {}
          #   connected_food_sources = set()
-            
+
          #   while queue:
          #       current_node, path = queue.popleft()
                 #current_node = tuple(current_node)
@@ -154,36 +155,31 @@ class ActiveWalkerModel(Model):
          #               if neighbor not in visited and m.grid.fields["A"] >= threshold:
          #                   new_path = path + [neighbor]
          #                   queue.append((neighbor, new_path))
-                    
+
                             # Check if the neighbor is a food source
          #                   if neighbor in self.grid_food:
          #                       if neighbor not in paths:
          #                           paths[neighbor] = new_path
          #                           connected_food_sources.add(neighbor)
 
-         #   connectivity = len(connected_food_sources)                    
-                                    
-         #   return connectivity
-        
-        
-        # Calculate connectivity through BFS
-        
-       # current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
-        
-  
-        
-        def subset_agent_count(self):
-            subset_agents = [agent for agent in self.schedule.agents if agent.sensitivity == self.s_0 and agent.look_for_pheromone == "B"]
-            count = float(len(subset_agents))
-            return count
+         #   connectivity = len(connected_food_sources)
 
-        
+         #   return connectivity
+
+
+        # Calculate connectivity through BFS
+
+       # current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
+
+
+
+
         self.datacollector = DataCollector(
                 # model_reporters={"agent_dens": lambda m: m.agent_density()},
                 model_reporters = {"pheromone_a": lambda m: m.grid.fields["A"],
                                     "pheromone_b": lambda m: m.grid.fields["B"],
-                                    "alive_ants": lambda m: self.schedule.get_agent_count(),
-                                    "sucessful_walkers": lambda m: subset_agent_count(self),
+                                    "alive_ants": lambda m: m.schedule.get_agent_count(),
+                                    "sucessful_walkers": lambda m: m.successful_ants,
                                     #"connectivity": lambda m: check_food_source_connectivity(self.grid_food,current_paths),
                                    },
                 agent_reporters={}
@@ -194,7 +190,7 @@ class ActiveWalkerModel(Model):
        # subset_agents = [agent for agent in self.schedule.agents if agent.sensitivity == self.s_0]
        # count = float(len(subset_agents))
        # return count
-        
+
     def agent_density(self):
         a = np.zeros((self.grid.width, self.grid.height))
         for i in range(self.grid.width):
