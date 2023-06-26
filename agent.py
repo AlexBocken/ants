@@ -17,6 +17,7 @@ import numpy.typing as npt
 from mesa.agent import Agent
 from mesa.space import Coordinate
 
+
 class RandomWalkerAnt(Agent):
     def __init__(self, unique_id, model,
                  look_for_pheromone=None,
@@ -112,8 +113,8 @@ class RandomWalkerAnt(Agent):
                     self.energy = self.model.e_0
 
                     #now look for other pheromone
-                    self.drop_pheromone = "B"
                     self.look_for_pheromone = "A"
+                    self.drop_pheromone = "B"
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
@@ -127,11 +128,13 @@ class RandomWalkerAnt(Agent):
                     self.sensitivity = self.model.s_0
                     self.energy = self.model.e_0
 
-                    self.look_for_pheromone = "A" # Is this a correct interpretation?
+                    self.look_for_pheromone = "B"
                     self.drop_pheromone = "A"
 
                     self._prev_pos = neighbor
                     self._next_pos = self.pos
+                    self.model.successful_ants += 1
+
 
                     # recruit new ants
                     for agent_id in self.model.get_unique_ids(self.model.N_r):
