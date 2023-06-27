@@ -172,6 +172,59 @@ def check_ants_follow_gradient():
         print(20*"#")
         model.step()
 
+def viviane_bfs_example_run():
+    # Breadth-first-search algorithm for connectivity
+    def bfs(graph, start_node, threshold): #graph=grid, start_node=nest, threshold=TBD?
+        from collections import deque
+        visited = set()
+        queue = deque([(start_node, [])])
+        paths = {}
+        connected_food_sources = set()
+
+        while queue:
+            current_node, path = queue.popleft()
+            #current_node = tuple(current_node)
+            visited.add(current_node)
+
+            if current_node in graph:
+                for neighbor, m.grid.fields["A"] in graph[current_node].items():
+                    if neighbor not in visited and m.grid.fields["A"] >= threshold:
+                        new_path = path + [neighbor]
+                        queue.append((neighbor, new_path))
+
+                        # Check if the neighbor is a food source
+                        if neighbor in self.grid_food:
+                            if neighbor not in paths:
+                                paths[neighbor] = new_path
+                                connected_food_sources.add(neighbor)
+
+        connectivity = len(connected_food_sources)
+
+        return connectivity
+
+
+    # Calculate connectivity through BFS
+
+    current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
+
+    import numpy as np
+
+    N = 121
+    N_X = int(np.sqrt(N))
+    N_Y = N // N_X
+    # fancy way of saying absolutely nothing but 11
+
+    xv, yv = np.meshgrid(np.arange(N_X), np.arange(N_Y), sparse=False, indexing='xy')
+
+
+    print(f"{N_X=}")
+
+    print(f"{N_Y=}")
+
+    print(f"{(xv, yv)=}")
+
+    print(f"{xv=}")
+
 
 from model import kwargs_paper_setup1 as kwargs
 if __name__ == "__main__":

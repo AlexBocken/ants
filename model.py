@@ -15,7 +15,6 @@ from multihex import MultiHexGridScalarFields
 from mesa.time import SimultaneousActivation
 from mesa.datacollection import DataCollector
 from agent import RandomWalkerAnt
-from collections import deque
 
 kwargs_paper_setup1 = {
         "width": 100,
@@ -101,6 +100,7 @@ class ActiveWalkerModel(Model):
         self.e_min : float   = e_min # energy at which walker dies
         self.N_f : int       = N_f #num food sources
         self.successful_ants = 0    # for viviane's graph
+        self.connectivity    = 0    # for viviane's persistence
 
         fields=["A", "B", "nests", "food", "res"]
         self.schedule = SimultaneousActivation(self)
@@ -141,39 +141,42 @@ class ActiveWalkerModel(Model):
 
 
         # Breadth-first-search algorithm for connectivity
-        #def bfs(graph, start_node, threshold): #graph=grid, start_node=nest, threshold=TBD?
-         #   visited = set()
-         #   queue = deque([(start_node, [])])
-         #   paths = {}
-         #   connected_food_sources = set()
+        # TODO: Implement pheromone B (take max of the two or sum?)
+        # alex: what's to say against max?
+        def bfs(self):
+            threshold = 0.0000001 #the value of A
+            connectivity = 0 #initial value of connectivity
+            connected_food_sources = list() #empty list of connected food sources
+            visited = list() #empty list of visited (by the algorithm) nodes
 
-         #   while queue:
-         #       current_node, path = queue.popleft()
-                #current_node = tuple(current_node)
-         #       visited.add(current_node)
+            nest = np.argwhere(self.grid.fields["nests"] == 1) #get nest location
+            nest = nest[0].tolist() #transforming not to have type errors
+            nest = tuple(nest) #transforming not to have type errors
+            start_node = nest #rename
 
-         #       if current_node in graph:
-         #           for neighbor, m.grid.fields["A"] in graph[current_node].items():
-         #               if neighbor not in visited and m.grid.fields["A"] >= threshold:
-         #                   new_path = path + [neighbor]
-         #                   queue.append((neighbor, new_path))
+            neighbours_to_check = list([start_node]) #start node gets checked first
+            neighbours_to_check = neighbours_to_check + self.grid.get_neighborhood(start_node) #start node neighbours get added to the to check list
 
-                            # Check if the neighbor is a food source
-         #                   if neighbor in self.grid_food:
-         #                       if neighbor not in paths:
-         #                           paths[neighbor] = new_path
-         #                           connected_food_sources.add(neighbor)
+            while neighbours_to_check: #as long as there is something on the to check list
+                current_node = neighbours_to_check[0] #the first list entry is taken
+                del neighbours_to_check[0] #and deleted on the to check list
 
-         #   connectivity = len(connected_food_sources)
+                if current_node not in visited: #if it has not previously been checked
+                    if self.grid.fields["A"][current_node] >= threshold: #and its A value is above our threshold
+                        new_neighbors = self.grid.get_neighborhood(current_node) #then we get its neighbours
+                        if new_neighbors not in visited: #if they have not yet been visited
+                            neighbours_to_check = neighbours_to_check + new_neighbors #then they are also added to our to check list
+                    visited = visited + list([current_node]) #and the current node has now been checked
 
-         #   return connectivity
+                neighbours_to_check = list(dict.fromkeys(neighbours_to_check)) #only check nodes once (unique values)
 
+                if self.grid.fields["food"][current_node] > 0: #in case the node we check is food
+                    connectivity += 1 #then we have found a connected path to a food source
+                    connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
 
-        # Calculate connectivity through BFS
+            return connectivity #we want the connectivity (0-5)
 
-       # current_paths = bfs(self.grid, self.grid.fields["nests"], 0.000001)
-
-
+        self.connectivity = bfs(self)
 
 
         self.datacollector = DataCollector(
@@ -182,7 +185,7 @@ class ActiveWalkerModel(Model):
                                     "pheromone_b": lambda m: m.grid.fields["B"],
                                     "alive_ants": lambda m: m.schedule.get_agent_count(),
                                     "sucessful_walkers": lambda m: m.successful_ants,
-                                    #"connectivity": lambda m: check_food_source_connectivity(self.grid_food,current_paths),
+                                    "connectivity": lambda m: m.connectivity,
                                    },
                 agent_reporters={}
                 )
