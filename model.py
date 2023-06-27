@@ -107,7 +107,6 @@ class ActiveWalkerModel(Model):
         self.grid = MultiHexGridScalarFields(width=width, height=height, torus=True, fields=fields)
 
         if resistance_map_type is None:
-            print("No resistance field")
             self.grid.fields["res"] = np.ones((width, height)).astype(float)
         elif resistance_map_type == "perlin":
             # perlin generates anisotropic noise which may or may not be a good choice
@@ -139,46 +138,6 @@ class ActiveWalkerModel(Model):
         for _ in range(N_f):
             self.grid.add_food(food_size)
 
-
-        # Breadth-first-search algorithm for connectivity
-        # TODO: Implement pheromone B (take max of the two or sum?)
-        # alex: what's to say against max?
-        def bfs(self):
-            threshold = 0.0000001 #the value of A
-            connectivity = 0 #initial value of connectivity
-            connected_food_sources = list() #empty list of connected food sources
-            visited = list() #empty list of visited (by the algorithm) nodes
-
-            nest = np.argwhere(self.grid.fields["nests"] == 1) #get nest location
-            nest = nest[0].tolist() #transforming not to have type errors
-            nest = tuple(nest) #transforming not to have type errors
-            start_node = nest #rename
-
-            neighbours_to_check = list([start_node]) #start node gets checked first
-            neighbours_to_check = neighbours_to_check + self.grid.get_neighborhood(start_node) #start node neighbours get added to the to check list
-
-            while neighbours_to_check: #as long as there is something on the to check list
-                current_node = neighbours_to_check[0] #the first list entry is taken
-                del neighbours_to_check[0] #and deleted on the to check list
-
-                if current_node not in visited: #if it has not previously been checked
-                    if self.grid.fields["A"][current_node] >= threshold: #and its A value is above our threshold
-                        new_neighbors = self.grid.get_neighborhood(current_node) #then we get its neighbours
-                        if new_neighbors not in visited: #if they have not yet been visited
-                            neighbours_to_check = neighbours_to_check + new_neighbors #then they are also added to our to check list
-                    visited = visited + list([current_node]) #and the current node has now been checked
-
-                neighbours_to_check = list(dict.fromkeys(neighbours_to_check)) #only check nodes once (unique values)
-
-                if self.grid.fields["food"][current_node] > 0: #in case the node we check is food
-                    connectivity += 1 #then we have found a connected path to a food source
-                    connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
-
-            return connectivity #we want the connectivity (0-5)
-
-        self.connectivity = bfs(self)
-
-
         self.datacollector = DataCollector(
                 # model_reporters={"agent_dens": lambda m: m.agent_density()},
                 model_reporters = {"pheromone_a": lambda m: m.grid.fields["A"],
@@ -191,10 +150,42 @@ class ActiveWalkerModel(Model):
                 )
         self.datacollector.collect(self) # keep at end of __init___
 
-    #def subset_agent_count(self):
-       # subset_agents = [agent for agent in self.schedule.agents if agent.sensitivity == self.s_0]
-       # count = float(len(subset_agents))
-       # return count
+    # Breadth-first-search algorithm for connectivity
+    # TODO: Implement pheromone B (take max of the two or sum?)
+    # alex: what's to say against max?
+    def bfs(self):
+        threshold = 0.0000001 #the value of A
+        connectivity = 0 #initial value of connectivity
+        connected_food_sources = list() #empty list of connected food sources
+        visited = list() #empty list of visited (by the algorithm) nodes
+
+        nest = np.argwhere(self.grid.fields["nests"] == 1) #get nest location
+        nest = nest[0].tolist() #transforming not to have type errors
+        nest = tuple(nest) #transforming not to have type errors
+        start_node = nest #rename
+
+        neighbours_to_check = list([start_node]) #start node gets checked first
+        neighbours_to_check = neighbours_to_check + self.grid.get_neighborhood(start_node) #start node neighbours get added to the to check list
+
+        while neighbours_to_check: #as long as there is something on the to check list
+            current_node = neighbours_to_check[0] #the first list entry is taken
+            del neighbours_to_check[0] #and deleted on the to check list
+
+            if current_node not in visited: #if it has not previously been checked
+                if self.grid.fields["A"][current_node] >= threshold: #and its A value is above our threshold
+                    new_neighbors = self.grid.get_neighborhood(current_node) #then we get its neighbours
+                    if new_neighbors not in visited: #if they have not yet been visited
+                        neighbours_to_check = neighbours_to_check + new_neighbors #then they are also added to our to check list
+                visited = visited + list([current_node]) #and the current node has now been checked
+
+            neighbours_to_check = list(dict.fromkeys(neighbours_to_check)) #only check nodes once (unique values)
+
+            if self.grid.fields["food"][current_node] > 0: #in case the node we check is food
+                connectivity += 1 #then we have found a connected path to a food source
+                connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
+
+        # why not normalize to 0-1 ?
+        return connectivity #we want the connectivity (0-5)
 
     def agent_density(self):
         a = np.zeros((self.grid.width, self.grid.height))
@@ -206,11 +197,13 @@ class ActiveWalkerModel(Model):
 
     def step(self):
         self.schedule.step()        # step() and advance() all agents
+        self.connectivity = self.bfs(self)
 
         # apply decay rate on pheromone levels
         for key in ("A", "B"):
             field = self.grid.fields[key]
             self.grid.fields[key] =  field - self.gamma*field
+
 
         self.datacollector.collect(self)
 
