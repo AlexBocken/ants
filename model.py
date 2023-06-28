@@ -156,15 +156,14 @@ class ActiveWalkerModel(Model):
     def bfs(self):
         threshold = 0.0000001 #the value of A
         connectivity = 0 #initial value of connectivity
-        connected_food_sources = list() #empty list of connected food sources
-        visited = list() #empty list of visited (by the algorithm) nodes
+        connected_food_sources = [] #empty list of connected food sources
+        visited = [] #empty list of visited (by the algorithm) nodes
 
         nest = np.argwhere(self.grid.fields["nests"] == 1) #get nest location
-        nest = nest[0].tolist() #transforming not to have type errors
-        nest = tuple(nest) #transforming not to have type errors
+        nest = (nest[0][0], nest[0][1])
         start_node = nest #rename
 
-        neighbours_to_check = list([start_node]) #start node gets checked first
+        neighbours_to_check = [start_node]  #start node gets checked first
         neighbours_to_check = neighbours_to_check + self.grid.get_neighborhood(start_node) #start node neighbours get added to the to check list
 
         while neighbours_to_check: #as long as there is something on the to check list
@@ -172,19 +171,19 @@ class ActiveWalkerModel(Model):
             del neighbours_to_check[0] #and deleted on the to check list
 
             if current_node not in visited: #if it has not previously been checked
-                if self.grid.fields["A"][current_node] >= threshold: #and its A value is above our threshold
+                if np.max([self.grid.fields["B"][current_node], self.grid.fields["A"][current_node]]) >= threshold: #and its A value is above our threshold
                     new_neighbors = self.grid.get_neighborhood(current_node) #then we get its neighbours
-                    if new_neighbors not in visited: #if they have not yet been visited
-                        neighbours_to_check = neighbours_to_check + new_neighbors #then they are also added to our to check list
-                visited = visited + list([current_node]) #and the current node has now been checked
+                    for new_neighbor in new_neighbors:
+                        if new_neighbor not in visited and new_neighbor not in neighbours_to_check:
+                            neighbours_to_check.append(new_neighbor) #then they are also added to our to check list
+                visited.append(current_node) #and the current node has now been checked
 
-            neighbours_to_check = list(dict.fromkeys(neighbours_to_check)) #only check nodes once (unique values)
-
-            if self.grid.fields["food"][current_node] > 0: #in case the node we check is food
-                connectivity += 1 #then we have found a connected path to a food source
-                connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
+                if self.grid.fields["food"][current_node] > 0: #in case the node we check is food
+                    connectivity += 1 #then we have found a connected path to a food source
+                    connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
 
         # why not normalize to 0-1 ?
+        print(f"{connectivity=}")
         return connectivity #we want the connectivity (0-5)
 
     def agent_density(self):
@@ -197,7 +196,8 @@ class ActiveWalkerModel(Model):
 
     def step(self):
         self.schedule.step()        # step() and advance() all agents
-        self.connectivity = self.bfs(self)
+        if self.schedule.steps % 100 == 0:
+            self.connectivity = self.bfs()
 
         # apply decay rate on pheromone levels
         for key in ("A", "B"):
