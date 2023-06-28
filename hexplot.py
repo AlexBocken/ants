@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_hexagon(A, title=None):
+def plot_hexagon(A, title=None, block=True):
     X, Y = np.meshgrid(range(A.shape[0]), range(A.shape[-1]))
     X, Y = X*2, Y*2
 
@@ -28,4 +28,4 @@ def plot_hexagon(A, title=None):
 
     if(title is not None):
         plt.title(title)
-    plt.show(block=False)
+    plt.show(block=block)

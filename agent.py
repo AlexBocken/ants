@@ -9,7 +9,7 @@ License: AGPL 3 (see end of file)
 
 """
 TO DISCUSS:
-Is the separation of energy and sensitivity useful?
+Is the separation of energy and sensitivity useful? -> only if we have the disconnect via resistance
 
 """
 import numpy as np
@@ -22,7 +22,7 @@ class RandomWalkerAnt(Agent):
     def __init__(self, unique_id, model,
                  look_for_pheromone=None,
                  drop_pheromone=None,
-                 sensitivity_max = 30000,
+                 sensitivity_max = 10000,
                  ) -> None:
 
         super().__init__(unique_id=unique_id, model=model)
@@ -81,9 +81,11 @@ class RandomWalkerAnt(Agent):
             # bit round-about but self.model.grid.fields['res'][positions]
             # gets interpreted as slices, not multiple singular positions
             resistance = np.array([ self.model.grid.fields['res'][x,y] for x,y in positions ])
-            easiness = np.max(self.model.grid.fields['res']) - resistance + 1e-15 # + epsilon to not divide by zero
+            easiness = np.max(self.model.grid.fields['res']) - resistance + np.min(self.model.grid.fields['res']) + 1e-15 # + epsilon to not divide by zero
             weights = easiness/ np.sum(easiness)
-
+            #inv_weights = resistance/ np.sum(resistance)
+            #weights = 1 - inv_weights
+            #weights /= np.sum(weights)
             return weights
 
     def _choose_next_pos(self):
@@ -103,7 +105,7 @@ class RandomWalkerAnt(Agent):
             """
             combined = res_weights * walk_weights
             normalized = combined / np.sum(combined)
-            return list(normalized)
+            return normalized
 
         def _pick_from_remaining_five(remaining_five):
             """
@@ -213,14 +215,16 @@ class RandomWalkerAnt(Agent):
         self._prev_pos = self.pos
 
     def step(self):
-        self.sensitivity -= self.model.d_s
-        self.energy -= self.model.grid.fields['res'][self.pos] * self.model.d_e
         # Die and get removed if no energy
         if self.energy < self.model.e_min:
             self.model.schedule.remove(self)
         else:
             self._choose_next_pos()
             self._adjust_pheromone_drop_rate()
+
+        self.sensitivity -= self.model.d_s
+        self.energy -= self.model.grid.fields['res'][self.pos] * self.model.d_e
+
 
     def _adjust_pheromone_drop_rate(self):
         if(self.drop_pheromone is not None):

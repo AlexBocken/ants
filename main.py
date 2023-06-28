@@ -226,23 +226,144 @@ def viviane_bfs_example_run():
     print(f"{xv=}")
 
 
-from model import kwargs_paper_setup1 as kwargs
-if __name__ == "__main__":
-    print("Test")
-    kwargs["resistance_map_type"] = "perlin"
-    print(kwargs)
-    model = ActiveWalkerModel(**kwargs)
 
+def fixed_distance_tests():
+    """
+    position a target food source a known distance away from nest
+    check for no. successful ants for n runs
+    """
+
+    from tqdm import tqdm
+    runs = 10
+    from model import kwargs_paper_setup1 as kwargs
+    kwargs["N_f"] = 0
+    kwargs["gamma"] /= 2 # field decays three times slower
+    kwargs["beta"] /= 2 # drop rates decays three times slower
+    kwargs["d_s"] /= 2 # drop rates decays three times slower
+    kwargs["d_e"] /= 2 # drop rates decays three times slower
+    successful_walkers = {}
+    for distance in tqdm(range(5,30), position=0, desc="dis"):
+        successful_walkers[distance] = []
+        for _ in tqdm(range(runs), position=1, desc="run", leave=False):
+            model = ActiveWalkerModel(**kwargs)
+            nest_location = kwargs["nest_position"]
+            food_location =  (nest_location[0] - distance, nest_location[1])
+            model.grid.add_food(size=100, pos=food_location)
+            for _ in tqdm(range(model.max_steps), position=2, desc="step", leave=False):
+                model.step()
+            successful_walkers[distance].append(model.datacollector.get_model_vars_dataframe().reset_index()["successful_walkers"][kwargs["max_steps"]])
+    return successful_walkers
+
+def fixed_distance_object_between():
+    """
+    diameter of object: floor(50% of distance)
+    """
+
+    from tqdm import tqdm
+    runs = 10
+    from model import kwargs_paper_setup1 as kwargs
+    kwargs["N_f"] = 0
+    kwargs["gamma"] /= 2 # field decays slower
+    kwargs["beta"] /= 2 # drop rates decays slower
+    kwargs["d_e"] /= 2 # live longer, search longer
+    kwargs["d_s"] /= 2 # live longer, search longer
+    successful_walkers = {}
+    for distance in tqdm(range(5,30), position=0, desc="dis"):
+        successful_walkers[distance] = []
+        for _ in tqdm(range(runs), position=1, desc="run", leave=False):
+            model = ActiveWalkerModel(**kwargs)
+            nest_location = kwargs["nest_position"]
+            food_location =  (nest_location[0] - distance, nest_location[1])
+            object_location =  (nest_location[0] - distance//2, nest_location[1])
+            place_blocking_object(object_location, radius=distance//4, model=model)
+            model.grid.add_food(size=100, pos=food_location)
+            for _ in tqdm(range(model.max_steps), position=2, desc="step", leave=False):
+                model.step()
+            successful_walkers[distance].append(model.datacollector.get_model_vars_dataframe().reset_index()["successful_walkers"][kwargs["max_steps"]])
+    return successful_walkers
+
+def place_blocking_object(center, radius, model):
+    positions = [center]
+    next_outside = [center]
+    # We grow from the center and add all neighbours of the outer edge of our blocking object
+    # Add all neighbours of next_outside that aren't in positions to the object
+    # by doing this radius times we should get an object of diameter 2 * radius + 1
+    # positions: accumulator for all positions inside the object of radius radius
+    # next_outside: keep track what we added in the last go-around. These will be used in the next step.
+    for _ in range(radius):
+        outside = next_outside
+        next_oustide = []
+
+        #otherwise interprets the tuple as something stupid
+        for i in range(len(outside)):
+            cell = outside[i]
+            neighbours = model.grid.get_neighborhood(cell)
+            for n in neighbours:
+                if n not in positions:
+                    positions.append(n)
+                    next_outside.append(n)
+
+    # some large number in comparison to the rest of the resistance field
+    # such that the probability of stepping on these grid spots tend towards zero
+    infinity = 1e20
+    for pos in positions:
+        model.grid.fields['res'][pos] = infinity
+
+
+def plot_heatmap():
     from hexplot import plot_hexagon
+    from tqdm import tqdm
+    # nests rather far away but also partially clumped.
+    np.random.seed(6)
+
+    from model import kwargs_paper_setup1 as kwargs
+    kwargs["gamma"] /= 3 # field decays slower
+    kwargs["beta"] /= 3 # drop rates decays slower
+    kwargs["d_e"] /= 3 # live longer, search longer
+    kwargs["d_s"] /= 3 # live longer, search longer
+
+    model = ActiveWalkerModel(**kwargs)
     a = np.zeros_like(model.grid.fields['food'])
     a[np.nonzero(model.grid.fields['food'])] = 1
-    plot_hexagon(a, title="Nest locations")
-    plot_hexagon(model.grid.fields['res'], title="Resistance Map")
-
-
-    from tqdm import tqdm as progress_bar
-    for _ in progress_bar(range(model.max_steps)):
+    a[np.nonzero(model.grid.fields['nests'])] = -1
+    plot_hexagon(a, title="food locations", block=False)
+    for _ in tqdm(range(model.max_steps)):
         model.step()
+
+    for time in np.arange(0, model.max_steps + 1, 1000):
+        pheromone_concentration = model.datacollector.get_model_vars_dataframe()["pheromone_a"][time]
+        a = pheromone_concentration
+        #plot_hexagon(a)
+        pheromone_concentration = model.datacollector.get_model_vars_dataframe()["pheromone_b"][time]
+        b = pheromone_concentration
+        #plot_hexagon(b)
+        c = np.max([a,b], axis=0)
+        c = a + b
+        c = np.clip(c, 0, 200)
+        plot_hexagon(c)
+
+
+#if __name__ == "__main__":
+plot_heatmap()
+#print("DISTANCE TEST VS SUCCESSFUL ANTS OBJECT INBETWEEN")
+#res = fixed_distance_tests()
+#res = fixed_distance_object_between()
+    # print("Test")
+#from model import kwargs_paper_setup1 as kwargs
+#kwargs["resistance_map_type"] = "perlin"
+    # print(kwargs)
+#model = ActiveWalkerModel(**kwargs)
+#model.step()
+
+    # a = np.zeros_like(model.grid.fields['food'])
+    # a[np.nonzero(model.grid.fields['food'])] = 1
+    # plot_hexagon(a, title="Nest locations")
+    # plot_hexagon(model.grid.fields['res'], title="Resistance Map")
+
+
+    # from tqdm import tqdm as progress_bar
+    # for _ in progress_bar(range(model.max_steps)):
+    #     model.step()
 
 
 
