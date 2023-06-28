@@ -218,6 +218,9 @@ class RandomWalkerAnt(Agent):
         # Die and get removed if no energy
         if self.energy < self.model.e_min:
             self.model.schedule.remove(self)
+            #update list of dead agents for time step
+            self.model.dead_agents[self.model.schedule.steps-1] += 1
+        
         else:
             self._choose_next_pos()
             self._adjust_pheromone_drop_rate()

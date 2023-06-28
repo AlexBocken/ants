@@ -129,6 +129,9 @@ class ActiveWalkerModel(Model):
         self.max_steps = max_steps
         self.grid.add_nest(nest_position)
 
+        self.dead_agents = [i*0 for i in range(self.max_steps)]
+        self.alive_agents = [self.N_r for i in range(self.max_steps)]
+
         for agent_id in self.get_unique_ids(N_0):
             if self.schedule.get_agent_count() < self.N_m:
                 agent = RandomWalkerAnt(unique_id=agent_id, model=self, look_for_pheromone="A", drop_pheromone="A")
@@ -206,8 +209,12 @@ class ActiveWalkerModel(Model):
 
 
         self.datacollector.collect(self)
+        self.alive_agents[self.schedule.steps-1] = len(self.schedule.agents)
+
 
         if self.schedule.steps >= self.max_steps:
+            self.plot_alive_agents()
+            self.plot_aliveDead_agents()
             self.running = False
 
     def get_unique_id(self) -> int:
@@ -218,6 +225,35 @@ class ActiveWalkerModel(Model):
         for _ in range(num_ids):
             yield self.get_unique_id()
 
+    def plot_aliveDead_agents(self):
+
+        import matplotlib.pyplot as plt
+        
+        plt.figure()
+        x = [i for i in range(self.max_steps)]
+        plt.plot(x, self.dead_agents, label="dead ants")
+        plt.plot(x, self.alive_agents, label="alive ants")
+        plt.title("Number of ants alive and dead per time step")
+        plt.legend(loc="best")
+        plt.xlabel('time steps')
+        plt.ylabel('Number of ants')
+
+        plt.show()
+
+    def plot_alive_agents(self):
+
+        import matplotlib.pyplot as plt
+        
+        plt.figure()
+        x = [i for i in range(self.max_steps)]
+        plt.plot(x, self.alive_agents, label="alive ants")
+        plt.title("Number of ants alive per time step")
+        plt.legend(loc="best")
+        plt.xlabel('time steps')
+        plt.ylabel('Number of ants')
+
+        plt.show()
+    
 """
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3.
 
