@@ -13,6 +13,9 @@ def plot_hexagon(A, title=None, block=True):
             Y[:,i] += 1
 
     fig, ax = plt.subplots()
+    fig.set_figwidth(10)
+    fig.set_figheight(10)
+    fig.set_dpi(600)
     im = ax.hexbin(
         X.reshape(-1),
         Y.reshape(-1),
@@ -24,8 +27,11 @@ def plot_hexagon(A, title=None, block=True):
     ax.set_aspect(1)
     ax.set(xlim=(-4, X.max()+4,), ylim=(-4, Y.max()+4))
     ax.axis(False)
-    plt.colorbar(im)
+    ax.set_xmargin(0)
+    ax.set_ymargin(0)
+    #plt.colorbar(im, shrink=0.7)
 
     if(title is not None):
-        plt.title(title)
-    plt.show(block=block)
+        pass
+        #plt.title(title)
+    plt.savefig(f"{title}.png")

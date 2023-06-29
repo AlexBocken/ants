@@ -101,6 +101,7 @@ class ActiveWalkerModel(Model):
         self.N_f : int       = N_f #num food sources
         self.successful_ants = 0    # for viviane's graph
         self.connectivity    = 0    # for viviane's persistence
+        self.dying_agents = 0
 
         fields=["A", "B", "nests", "food", "res"]
         self.schedule = SimultaneousActivation(self)
@@ -129,8 +130,6 @@ class ActiveWalkerModel(Model):
         self.max_steps = max_steps
         self.grid.add_nest(nest_position)
 
-        self.dead_agents = [i*0 for i in range(self.max_steps)]
-        self.alive_agents = [self.N_r for i in range(self.max_steps)]
 
         for agent_id in self.get_unique_ids(N_0):
             if self.schedule.get_agent_count() < self.N_m:
@@ -146,7 +145,8 @@ class ActiveWalkerModel(Model):
                 model_reporters = {"pheromone_a": lambda m: m.grid.fields["A"],
                                     "pheromone_b": lambda m: m.grid.fields["B"],
                                     "alive_ants": lambda m: m.schedule.get_agent_count(),
-                                    "sucessful_walkers": lambda m: m.successful_ants,
+                                    "dying_ants": lambda m: m.dying_agents,
+                                    "successful_walkers": lambda m: m.successful_ants,
                                     "connectivity": lambda m: m.connectivity,
                                    },
                 agent_reporters={}
@@ -154,10 +154,8 @@ class ActiveWalkerModel(Model):
         self.datacollector.collect(self) # keep at end of __init___
 
     # Breadth-first-search algorithm for connectivity
-    # TODO: Implement pheromone B (take max of the two or sum?)
-    # alex: what's to say against max?
     def bfs(self):
-        threshold = 0.0000001 #the value of A
+        threshold = 0.5 # half of min sens
         connectivity = 0 #initial value of connectivity
         connected_food_sources = [] #empty list of connected food sources
         visited = [] #empty list of visited (by the algorithm) nodes
@@ -186,7 +184,6 @@ class ActiveWalkerModel(Model):
                     connected_food_sources = connected_food_sources + list([current_node]) #and it is added to the list of connected food sources
 
         # why not normalize to 0-1 ?
-        print(f"{connectivity=}")
         return connectivity #we want the connectivity (0-5)
 
     def agent_density(self):
@@ -198,9 +195,11 @@ class ActiveWalkerModel(Model):
 
 
     def step(self):
+        self.dying_agents = 0
         self.schedule.step()        # step() and advance() all agents
+
         if self.schedule.steps % 100 == 0:
-            self.connectivity = self.bfs()
+            pass
 
         # apply decay rate on pheromone levels
         for key in ("A", "B"):
@@ -209,12 +208,8 @@ class ActiveWalkerModel(Model):
 
 
         self.datacollector.collect(self)
-        self.alive_agents[self.schedule.steps-1] = len(self.schedule.agents)
-
 
         if self.schedule.steps >= self.max_steps:
-            self.plot_alive_agents()
-            self.plot_aliveDead_agents()
             self.running = False
 
     def get_unique_id(self) -> int:
@@ -225,35 +220,7 @@ class ActiveWalkerModel(Model):
         for _ in range(num_ids):
             yield self.get_unique_id()
 
-    def plot_aliveDead_agents(self):
 
-        import matplotlib.pyplot as plt
-        
-        plt.figure()
-        x = [i for i in range(self.max_steps)]
-        plt.plot(x, self.dead_agents, label="dead ants")
-        plt.plot(x, self.alive_agents, label="alive ants")
-        plt.title("Number of ants alive and dead per time step")
-        plt.legend(loc="best")
-        plt.xlabel('time steps')
-        plt.ylabel('Number of ants')
-
-        plt.show()
-
-    def plot_alive_agents(self):
-
-        import matplotlib.pyplot as plt
-        
-        plt.figure()
-        x = [i for i in range(self.max_steps)]
-        plt.plot(x, self.alive_agents, label="alive ants")
-        plt.title("Number of ants alive per time step")
-        plt.legend(loc="best")
-        plt.xlabel('time steps')
-        plt.ylabel('Number of ants')
-
-        plt.show()
-    
 """
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3.
 

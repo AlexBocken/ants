@@ -160,6 +160,7 @@ class RandomWalkerAnt(Agent):
 
 
                     # recruit new ants
+                    print("RECRUITING")
                     for agent_id in self.model.get_unique_ids(self.model.N_r):
                         if self.model.schedule.get_agent_count() <  self.model.N_m:
                             agent = RandomWalkerAnt(unique_id=agent_id, model=self.model, look_for_pheromone="B", drop_pheromone="A")
@@ -219,8 +220,8 @@ class RandomWalkerAnt(Agent):
         if self.energy < self.model.e_min:
             self.model.schedule.remove(self)
             #update list of dead agents for time step
-            self.model.dead_agents[self.model.schedule.steps-1] += 1
-        
+            self.model.dying_agents += 1
+
         else:
             self._choose_next_pos()
             self._adjust_pheromone_drop_rate()

@@ -310,41 +310,71 @@ def place_blocking_object(center, radius, model):
         model.grid.fields['res'][pos] = infinity
 
 
-def plot_heatmap():
-    from hexplot import plot_hexagon
+def run_model():
     from tqdm import tqdm
     # nests rather far away but also partially clumped.
     np.random.seed(6)
 
     from model import kwargs_paper_setup1 as kwargs
-    kwargs["gamma"] /= 3 # field decays slower
-    kwargs["beta"] /= 3 # drop rates decays slower
-    kwargs["d_e"] /= 3 # live longer, search longer
-    kwargs["d_s"] /= 3 # live longer, search longer
+    kwargs["gamma"] /= 2
+    kwargs["beta"] /= 2
+    kwargs["d_e"] /= 5 # live longer, search longer
+    kwargs["d_s"] /= 5 # live longer, search longer
+    kwargs["N_0"] *= 2 # more initial roamers/scouts
+    kwargs["max_steps"] *= 2 # more initial roamers/scouts
 
     model = ActiveWalkerModel(**kwargs)
     a = np.zeros_like(model.grid.fields['food'])
     a[np.nonzero(model.grid.fields['food'])] = 1
     a[np.nonzero(model.grid.fields['nests'])] = -1
-    plot_hexagon(a, title="food locations", block=False)
     for _ in tqdm(range(model.max_steps)):
         model.step()
+    return model
 
-    for time in np.arange(0, model.max_steps + 1, 1000):
-        pheromone_concentration = model.datacollector.get_model_vars_dataframe()["pheromone_a"][time]
-        a = pheromone_concentration
-        #plot_hexagon(a)
-        pheromone_concentration = model.datacollector.get_model_vars_dataframe()["pheromone_b"][time]
-        b = pheromone_concentration
-        #plot_hexagon(b)
-        c = np.max([a,b], axis=0)
-        c = a + b
-        c = np.clip(c, 0, 200)
-        plot_hexagon(c)
 
+
+from model import kwargs_paper_setup1 as kwargs
+kwargs["gamma"] /= 2
+kwargs["beta"] /= 2
+kwargs["d_e"] /= 5 # live longer, search longer
+kwargs["d_s"] /= 5 # live longer, search longer
+kwargs["N_0"] *= 2 # more initial roamers/scouts
+kwargs["max_steps"] *= 2 # more initial roamers/scouts
+
+def run_model_objects(step, seed=None, title=None):
+    from tqdm import tqdm
+    # nests rather far away but also partially clumped.
+    np.random.seed(6)
+    from hexplot import plot_hexagon
+    model = ActiveWalkerModel(**kwargs)
+    a = np.zeros_like(model.grid.fields['food'])
+    a[np.nonzero(model.grid.fields['food'])] = 1
+    a[np.nonzero(model.grid.fields['nests'])] = -1
+    for current_step in tqdm(range(model.max_steps)):
+        if current_step == step:
+            if seed is not None:
+                np.random.seed(seed)
+            for _ in range(10):
+                coord = np.random.randint(0, 100, size=2)
+                coord = (coord[0], coord[1])
+                place_blocking_object(center=coord,radius=5, model=model)
+            a = model.grid.fields["res"]
+            if title is not None:
+                plot_hexagon(a, title=title)
+        model.step()
+    return model
 
 #if __name__ == "__main__":
-plot_heatmap()
+#plot_heatmap()
+#res = run_model_no_objects()
+for i in range(10):
+    res = run_model_objects(step=6000, seed=i+100, title=f"objects/blockings_run_{i}")
+    from plot import plot_alive_ants_vs_time, dead_ants_vs_time, plot_connectivity_vs_time
+    plot_alive_ants_vs_time(res, title=f"objects/run_{i}")
+    dead_ants_vs_time(res, title=f"objects/dead_ants_run_{i}")
+    plot_connectivity_vs_time(res, title=f"objects/conn_run_{i}")
+
+
 #print("DISTANCE TEST VS SUCCESSFUL ANTS OBJECT INBETWEEN")
 #res = fixed_distance_tests()
 #res = fixed_distance_object_between()
